@@ -68,6 +68,7 @@ Item {
                     { id: "stage",      icon: "eye",        label: ShellConfig.stageVisible ? "Скрыть обложку и текст" : "Показать обложку и текст", active: false },
                     { id: "dock",       icon: "sliders",    label: ShellConfig.dockPinned ? "Открепить нижний док" : "Закрепить нижний док", active: ShellConfig.dockPinned },
                     { id: "sep2",       sep: true },
+                    { id: "wallpaper",  icon: "palette",    label: "Выбрать обои (Win+W)", active: false },
                     { id: "screenshot", icon: "screenshot", label: "Сделать скриншот", active: false },
                     { id: "settings",   icon: "settings",   label: "Настройки шелла", active: false },
                     { id: "reload",     icon: "reboot",     label: "Перезагрузить шелл", active: false }
@@ -144,6 +145,8 @@ Item {
                                 } else if (act === "dock") {
                                     ShellConfig.dockPinned = !ShellConfig.dockPinned
                                     ShellConfig.save()
+                                } else if (act === "wallpaper") {
+                                    WallpaperState.toggle()
                                 } else if (act === "screenshot") {
                                     ScreenshotState.open("region")
                                 } else if (act === "settings") {

@@ -3,12 +3,14 @@ import QtQuick.Layouts
 import "../services"
 
 /**
- * Floating Material You Wavy OSD Pill (Volume / Brightness / Keyboard Layout):
- * Appears smoothly near the bottom-center (or above dock) whenever values change.
+ * Floating Material You Wavy OSD Pill (Volume / Brightness / Keyboard Layout / Modes):
+ * Dynamically sizes to fit text cleanly with zero overlap.
  */
 Item {
     id: root
-    width: SystemState.osdShowBar ? 256 : 164
+    width: SystemState.osdShowBar
+        ? 264
+        : Math.max(156, Math.round(osdLabelTxt.implicitWidth + osdValTxt.implicitWidth + 84))
     height: 48
 
     visible: ShellConfig.osdEnabled && opacity > 0.01
@@ -19,7 +21,7 @@ Item {
     Behavior on opacity { M3Anim { duration: 220 } }
     Behavior on scale   { M3Anim { duration: 300 } }
     Behavior on y       { M3Anim { duration: 300 } }
-    Behavior on width   { M3Anim { duration: 260 } }
+    Behavior on width   { M3Anim { duration: 240 } }
 
     Rectangle {
         anchors.fill: parent
@@ -30,7 +32,7 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 16
             anchors.rightMargin: 16
-            spacing: 12
+            spacing: 10
 
             SysIcon {
                 name: SystemState.osdIcon
@@ -55,8 +57,8 @@ Item {
             }
 
             Text {
+                id: osdLabelTxt
                 visible: !SystemState.osdShowBar
-                Layout.fillWidth: true
                 text: SystemState.osdLabel
                 color: MusicState.m3OnSurfaceVariant
                 font.family: MusicState.fontUi
@@ -65,7 +67,13 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
 
+            Item {
+                visible: !SystemState.osdShowBar
+                Layout.fillWidth: true
+            }
+
             Text {
+                id: osdValTxt
                 text: SystemState.osdText
                 color: MusicState.m3OnSurface
                 font.family: MusicState.fontUi

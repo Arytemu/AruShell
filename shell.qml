@@ -28,6 +28,15 @@ ShellRoot {
         source: "components/SettingsWindow.qml"
     }
 
+    Loader {
+        id: wallpaperLoader
+        active: WallpaperState.open
+        source: "components/WallpaperCarousel.qml"
+    }
+
+    // Caelestia-style Native Wayland Lock Screen (SUPER + L & 10-min hypridle)
+    LockScreen {}
+
     // Global IPC for Hyprland keybinds:
     //   quickshell ipc -c AruShell call screenshot open
     //   quickshell ipc -c AruShell call screenshot full
@@ -53,6 +62,16 @@ ShellRoot {
     IpcHandler {
         target: "settings"
         function toggle(): void { ShellConfig.toggleSettings() }
+    }
+
+    IpcHandler {
+        target: "wallpaper"
+        function toggle(): void { WallpaperState.toggle() }
+    }
+
+    IpcHandler {
+        target: "lock"
+        function lock(): void { LockState.lock() }
     }
 
     // =========================================================================
@@ -151,10 +170,12 @@ ShellRoot {
                 }
             }
 
-            // Draggable Desktop Music Stage (AlbumCard + LyricsView)
+            // Draggable Desktop Music Stage (auto-hides cleanly when music is NOT playing!)
             Item {
                 id: musicStage
-                visible: ShellConfig.stageVisible
+                opacity: (ShellConfig.stageVisible && (MusicState.hasTrack || ShellConfig.editMode)) ? 1.0 : 0.0
+                visible: opacity > 0.01
+                Behavior on opacity { M3Anim { duration: 360 } }
                 width: parent.width
                 height: 400
                 x: Math.round(ShellConfig.stageOffsetX)
@@ -302,7 +323,7 @@ ShellRoot {
 
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.namespace: "arushell-topbar"
-            WlrLayershell.keyboardFocus: (SystemState.launcherOpen || ClipboardState.open) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            WlrLayershell.keyboardFocus: (SystemState.launcherOpen || ClipboardState.open || SystemState.wifiPasswordTarget !== "") ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             color: "transparent"
 
             // Input mask: only captures clicks in top 48px strip when closed, full popup area when open!

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Effects
+import Quickshell
 import Quickshell.Hyprland
 import "../services"
 
@@ -17,17 +18,33 @@ Item {
         }
         return Hyprland.focusedWorkspace
     }
-    readonly property bool desktopIsEmpty: !currentWs || !currentWs.toplevels || !currentWs.toplevels.values || currentWs.toplevels.values.length === 0
+    readonly property bool desktopIsEmpty: !ShellConfig.videoEmptyDesktopOnly || !currentWs || !currentWs.toplevels || !currentWs.toplevels.values || currentWs.toplevels.values.length === 0
+    readonly property bool hasCustomWall: ShellConfig.wallpaperPath !== ""
 
     Rectangle {
         anchors.fill: parent
         color: "#09090D"
     }
 
-    // --- Layer A: Cinematic Animated Album Art + Fluid Color Orbs ---
+    // --- Layer 0: Crisp User Wallpaper (selected via Win+W Carousel) ---
+    Image {
+        id: userWallpaper
+        anchors.fill: parent
+        source: root.hasCustomWall ? ("file://" + ShellConfig.wallpaperPath) : ""
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        smooth: true
+        opacity: (root.hasCustomWall && status === Image.Ready) ? 1.0 : 0.0
+        Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+    }
+
+    // --- Layer A: Blurred Animated Album Art (only when music is playing) + Fallback Orbs ---
     Item {
         id: fluidArtLayer
         anchors.fill: parent
+        opacity: (MusicState.hasTrack && MusicState.artUrl !== "") ? 1.0 : (root.hasCustomWall ? 0.0 : 1.0)
+        visible: opacity > 0.01
+        Behavior on opacity { NumberAnimation { duration: 480; easing.type: Easing.InOutCubic } }
 
         Image {
             id: bgArt
@@ -60,7 +77,7 @@ Item {
         MultiEffect {
             anchors.fill: parent
             source: bgArt
-            visible: bgArt.status === Image.Ready
+            visible: MusicState.hasTrack && bgArt.status === Image.Ready
             blurEnabled: true
             blur: 0.72
             blurMax: 64
@@ -76,16 +93,9 @@ Item {
             radius: width / 2
             x: -width * 0.15
             y: -height * 0.25
-            color: Qt.rgba(MusicState.accentColor.r, MusicState.accentColor.g, MusicState.accentColor.b, 0.28)
+            color: Qt.rgba(MusicState.accentColor.r, MusicState.accentColor.g, MusicState.accentColor.b, 0.24)
             Behavior on color { ColorAnimation { duration: 1000 } }
-            visible: bgArt.status !== Image.Ready
-
-            SequentialAnimation on x {
-                running: orb1.visible && root.desktopIsEmpty
-                loops: Animation.Infinite
-                NumberAnimation { from: -orb1.width * 0.18; to: root.width * 0.25; duration: 12000; easing.type: Easing.InOutSine }
-                NumberAnimation { from: root.width * 0.25; to: -orb1.width * 0.18; duration: 12000; easing.type: Easing.InOutSine }
-            }
+            visible: !root.hasCustomWall && (!MusicState.hasTrack || bgArt.status !== Image.Ready)
         }
 
         Rectangle {
@@ -95,16 +105,9 @@ Item {
             radius: width / 2
             x: root.width * 0.55
             y: root.height * 0.35
-            color: Qt.rgba(MusicState.secondaryAccentColor.r, MusicState.secondaryAccentColor.g, MusicState.secondaryAccentColor.b, 0.25)
+            color: Qt.rgba(MusicState.secondaryAccentColor.r, MusicState.secondaryAccentColor.g, MusicState.secondaryAccentColor.b, 0.22)
             Behavior on color { ColorAnimation { duration: 1000 } }
-            visible: bgArt.status !== Image.Ready
-
-            SequentialAnimation on y {
-                running: orb2.visible && root.desktopIsEmpty
-                loops: Animation.Infinite
-                NumberAnimation { from: root.height * 0.15; to: root.height * 0.45; duration: 10000; easing.type: Easing.InOutSine }
-                NumberAnimation { from: root.height * 0.45; to: root.height * 0.15; duration: 10000; easing.type: Easing.InOutSine }
-            }
+            visible: !root.hasCustomWall && (!MusicState.hasTrack || bgArt.status !== Image.Ready)
         }
     }
 
@@ -119,13 +122,13 @@ Item {
         }
     }
 
-    // Subtle cinematic vignette
+    // Subtle cinematic vignette (lighter when viewing clean wallpaper)
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(0.0, 0.0, 0.0, 0.30) }
-            GradientStop { position: 0.45; color: Qt.rgba(0.0, 0.0, 0.0, 0.08) }
-            GradientStop { position: 1.0; color: Qt.rgba(0.0, 0.0, 0.0, 0.46) }
+            GradientStop { position: 0.0; color: Qt.rgba(0.0, 0.0, 0.0, MusicState.hasTrack ? 0.30 : 0.14) }
+            GradientStop { position: 0.45; color: Qt.rgba(0.0, 0.0, 0.0, MusicState.hasTrack ? 0.08 : 0.02) }
+            GradientStop { position: 1.0; color: Qt.rgba(0.0, 0.0, 0.0, MusicState.hasTrack ? 0.46 : 0.22) }
         }
     }
 }

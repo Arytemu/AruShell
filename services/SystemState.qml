@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 /**
  * Reactive System State Service:
@@ -23,6 +24,9 @@ Singleton {
     property string wifiSsid: ""
     property bool ethernetConnected: false
     property var wifiNetworks: []
+    property string wifiPasswordTarget: ""
+    property string wifiStatusMsg: ""
+    property bool wifiConnecting: false
 
     // Bluetooth
     property bool btEnabled: false
@@ -51,6 +55,13 @@ Singleton {
     property string diskText: ""
     property string uptimeText: ""
     property string userName: "user"
+    property string hostName: ""
+    property string kernelVer: ""
+    property string distroName: "CachyOS"
+    property string netDown: "0 KB/s"
+    property string netUp: "0 KB/s"
+    property bool gameMode: false
+    property bool keepAwake: false
 
     // Daily-driver extras
     property string kbdLayout: "EN"
@@ -61,6 +72,12 @@ Singleton {
     property string weatherTemp: ""
     property string weatherDesc: ""
     property string weatherCity: ""
+    property string weatherFeels: ""
+    property string weatherHumidity: ""
+    property string weatherWind: ""
+    property string weatherSunrise: ""
+    property string weatherSunset: ""
+    property var weatherForecast: []
 
     // OSD Pill State
     property bool osdVisible: false
@@ -83,6 +100,34 @@ Singleton {
         osdHideTimer.restart()
     }
 
+
+    function _parseLayoutCode(layoutName) {
+        const low = String(layoutName || "").trim().toLowerCase()
+        if (!low) return ""
+        if (low.indexOf("russian") !== -1 || low.indexOf("рус") !== -1 || low === "ru" || low.startsWith("ru ")) return "RU"
+        if (low.indexOf("english") !== -1 || low.indexOf("us") !== -1 || low === "en" || low.startsWith("en ")) return "EN"
+        if (low.indexOf("ukrain") !== -1) return "UK"
+        if (low.indexOf("german") !== -1) return "DE"
+        if (low.indexOf("french") !== -1) return "FR"
+        return String(layoutName).trim().slice(0, 2).toUpperCase()
+    }
+
+    // Instant 0ms keyboard layout detection via Hyprland IPC `activelayout>>keyboard,layout`
+    Connections {
+        target: Hyprland
+        function onRawEvent(ev) {
+            if (!ev || ev.name !== "activelayout") return
+            const raw = String(ev.data || "")
+            const comma = raw.lastIndexOf(",")
+            const layoutName = comma !== -1 ? raw.slice(comma + 1).trim() : raw.trim()
+            const code = root._parseLayoutCode(layoutName)
+            if (code && code !== root.kbdLayout) {
+                root.kbdLayout = code
+                root.showOsd("keyboard", "Раскладка", 1.0, code, false)
+            }
+        }
+    }
+
     Timer {
         id: osdHideTimer
         interval: 1800
@@ -95,6 +140,8 @@ Singleton {
         if (launcherOpen) {
             quickSettingsOpen = false
             quickSettingsSubmenu = ""
+        wifiPasswordTarget = ""
+        wifiStatusMsg = ""
             ClipboardState.open = false
             NotifState.closeAllPopups()
         }
@@ -106,6 +153,8 @@ Singleton {
         quickSettingsOpen = !quickSettingsOpen
         if (quickSettingsOpen) {
             quickSettingsSubmenu = ""
+        wifiPasswordTarget = ""
+        wifiStatusMsg = ""
             NotifState.closeAllPopups()
             refreshAll()
         }
@@ -129,10 +178,27 @@ Singleton {
         runCmd("nmcli radio wifi " + next)
     }
 
-    function connectWifi(ssid) {
-        if (!ssid) return
-        runCmd("nmcli dev wifi connect " + JSON.stringify(ssid))
-        quickSettingsSubmenu = ""
+    function connectWifi(ssid, password, security, saved) {
+        if (!ssid || wifiConnecting) return
+        const pw = String(password || "")
+        const needsPw = !!security && !saved && pw === ""
+        if (needsPw) {
+            wifiPasswordTarget = ssid
+            wifiStatusMsg = ""
+            return
+        }
+        wifiConnecting = true
+        wifiStatusMsg = "Подключение к " + ssid + "..."
+        wifiConnectProc.targetSsid = ssid
+        wifiConnectProc.command = pw !== ""
+            ? ["bash", sysScript, "wifi-connect", ssid, pw]
+            : ["bash", sysScript, "wifi-connect", ssid]
+        wifiConnectProc.running = true
+    }
+
+    function cancelWifiPassword() {
+        wifiPasswordTarget = ""
+        wifiStatusMsg = ""
     }
 
     function toggleBluetooth() {
@@ -190,6 +256,28 @@ Singleton {
         delayedRefresh.restart()
     }
 
+    function toggleGameMode() {
+        gameMode = !gameMode
+        if (gameMode) {
+            Quickshell.execDetached(["bash", "-c", "hyprctl --batch 'keyword animations:enabled 0; keyword decoration:blur:enabled 0; keyword decoration:shadow:enabled 0' >/dev/null 2>&1"])
+            showOsd("apps", "Игровой режим", 1.0, "Вкл", false)
+        } else {
+            Quickshell.execDetached(["bash", "-c", "hyprctl reload >/dev/null 2>&1"])
+            showOsd("apps", "Игровой режим", 0.0, "Выкл", false)
+        }
+    }
+
+    function toggleKeepAwake() {
+        keepAwake = !keepAwake
+        if (keepAwake) {
+            Quickshell.execDetached(["bash", "-c", "pkill -x hypridle 2>/dev/null || true"])
+            showOsd("brightness", "Не засыпать", 1.0, "Вкл", false)
+        } else {
+            Quickshell.execDetached(["bash", "-c", "command -v hypridle >/dev/null 2>&1 && (pgrep -x hypridle >/dev/null || nohup hypridle >/dev/null 2>&1 &)"])
+            showOsd("brightness", "Не засыпать", 0.0, "Выкл", false)
+        }
+    }
+
     function cyclePowerProfile() {
         if (!powerProfile) return
         const order = ["power-saver", "balanced", "performance"]
@@ -206,7 +294,7 @@ Singleton {
     function lockScreen() {
         quickSettingsOpen = false
         launcherOpen = false
-        Quickshell.execDetached(["bash", "-c", "hyprlock 2>/dev/null || swaylock 2>/dev/null || loginctl lock-session"])
+        LockState.lock()
     }
 
     function suspendSystem() {
@@ -234,9 +322,11 @@ Singleton {
         }
     }
 
-    function refreshWifiList() {
+    function refreshWifiList(rescan) {
         if (!wifiListProc.running) {
-            wifiListProc.command = ["bash", sysScript, "wifi-list"]
+            wifiListProc.command = rescan
+                ? ["bash", sysScript, "wifi-list", "rescan"]
+                : ["bash", sysScript, "wifi-list"]
             wifiListProc.running = true
         }
     }
@@ -281,7 +371,7 @@ Singleton {
     }
 
     Timer {
-        interval: 1500
+        interval: 2500
         running: true
         repeat: true
         triggeredOnStart: true
@@ -332,6 +422,11 @@ Singleton {
                     root.nightLight = !!d.nightLight
                     root.powerProfile = d.powerProfile || ""
                     root.kbdLayout = d.kbdLayout || "EN"
+                    if (d.hostName) root.hostName = d.hostName
+                    if (d.kernelVer) root.kernelVer = d.kernelVer
+                    if (d.distroName) root.distroName = d.distroName
+                    if (d.netDown) root.netDown = d.netDown
+                    if (d.netUp) root.netUp = d.netUp
 
                     // Auto-trigger OSD when hardware keys change volume, brightness, or layout!
                     if (root._firstPollDone) {
@@ -341,7 +436,7 @@ Singleton {
                         } else if (root.hasBrightness && root.brightness !== prevBr) {
                             root.showOsd("brightness", "Яркость", root.brightness / 100.0, root.brightness + "%", true)
                         } else if (root.kbdLayout !== prevKbd) {
-                            root.showOsd("apps", "Раскладка", 1.0, root.kbdLayout, false)
+                            root.showOsd("keyboard", "Раскладка", 1.0, root.kbdLayout, false)
                         }
                     } else {
                         root._firstPollDone = true
@@ -361,6 +456,36 @@ Singleton {
                 try { root.wifiNetworks = JSON.parse(s) } catch (e) {}
             }
         }
+    }
+
+    Process {
+        id: wifiConnectProc
+        property string targetSsid: ""
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                const s = line.trim()
+                if (!s.startsWith("{")) return
+                root.wifiConnecting = false
+                try {
+                    const res = JSON.parse(s)
+                    if (res.ok) {
+                        root.wifiPasswordTarget = ""
+                        root.wifiStatusMsg = "Подключено!"
+                        root.refreshAll()
+                        root.refreshWifiList(false)
+                    } else if (res.needPassword) {
+                        root.wifiPasswordTarget = wifiConnectProc.targetSsid
+                        root.wifiStatusMsg = "Введите пароль сети"
+                    } else {
+                        root.wifiStatusMsg = res.error || "Ошибка подключения"
+                    }
+                } catch (e) {
+                    root.wifiStatusMsg = "Ошибка подключения"
+                }
+            }
+        }
+        onExited: root.wifiConnecting = false
     }
 
     Process {
@@ -399,6 +524,12 @@ Singleton {
                     if (d.temp) root.weatherTemp = d.temp
                     if (d.desc) root.weatherDesc = d.desc
                     if (d.city) root.weatherCity = d.city
+                    if (d.feels) root.weatherFeels = d.feels
+                    if (d.humidity) root.weatherHumidity = d.humidity
+                    if (d.wind) root.weatherWind = d.wind
+                    if (d.sunrise) root.weatherSunrise = d.sunrise
+                    if (d.sunset) root.weatherSunset = d.sunset
+                    if (Array.isArray(d.forecast)) root.weatherForecast = d.forecast
                 } catch (e) {}
             }
         }

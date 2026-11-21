@@ -38,8 +38,31 @@ Item {
         return { title: monthsRu[mo] + " " + yr, cells: cells }
     }
 
-    readonly property int targetWidth: isExpanded ? 540 : (isToast ? 380 : Math.max(192, compactRow.implicitWidth + 32))
-    readonly property int targetHeight: isExpanded ? 292 : (isToast ? 60 : 36)
+    readonly property bool _mediaHasLyrics: MusicState.hasTrack && MusicState.lyricsLines && MusicState.lyricsLines.length > 0
+
+    readonly property int targetWidth: {
+        if (isExpanded) {
+            if (currentTab === 0) return 530
+            if (currentTab === 1) return _mediaHasLyrics ? 660 : 504
+            if (currentTab === 2) return 530
+            return 550
+        }
+        if (isToast) {
+            return 370
+        }
+        return Math.round(compactRow.implicitWidth + 28)
+    }
+
+    readonly property int targetHeight: {
+        if (isExpanded) {
+            if (currentTab === 0) return 296
+            if (currentTab === 1) return _mediaHasLyrics ? 296 : 272
+            if (currentTab === 2) return 280
+            return 296
+        }
+        if (isToast) return 60
+        return 36
+    }
 
     implicitWidth: islandBody.width
     implicitHeight: islandBody.height
@@ -281,14 +304,14 @@ Item {
 
                 Rectangle {
                     id: tabIndicator
+                    property real animTab: root.currentTab
+                    Behavior on animTab { M3Anim { duration: 300 } }
                     height: 30
-                    width: (parent.width - 6) / 3
+                    width: (parent.width - 6) / 4
                     y: 3
-                    x: 3 + root.currentTab * width
+                    x: 3 + animTab * width
                     radius: 15
                     color: MusicState.m3PrimaryContainer
-
-                    Behavior on x { M3Anim { duration: 340 } }
                 }
 
                 Row {
@@ -297,10 +320,10 @@ Item {
                     anchors.margins: 3
 
                     Repeater {
-                        model: ["Dashboard", "Media", "Performance"]
+                        model: ["Dashboard", "Media", "Performance", "Weather"]
 
                         delegate: Item {
-                            width: tabRow.width / 3
+                            width: tabRow.width / 4
                             height: tabRow.height
 
                             Text {
@@ -334,7 +357,9 @@ Item {
                 RowLayout {
                     anchors.fill: parent
                     spacing: 12
-                    visible: root.currentTab === 0
+                    opacity: root.currentTab === 0 ? 1.0 : 0.0
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
                     // Left Card: Clock + Weather + User/Uptime + Screenshot
                     Rectangle {
@@ -565,25 +590,38 @@ Item {
                     anchors.fill: parent
                     radius: 20
                     color: MusicState.m3SurfaceContainerHigh
-                    visible: root.currentTab === 1
+                    opacity: root.currentTab === 1 ? 1.0 : 0.0
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    clip: true
 
                     RowLayout {
                         anchors.fill: parent
-                        anchors.margins: 14
+                        anchors.margins: 16
                         spacing: 16
 
                         ClippingRectangle {
-                            Layout.preferredWidth: 148
-                            Layout.preferredHeight: 148
+                            Layout.preferredWidth: 132
+                            Layout.preferredHeight: 132
                             Layout.alignment: Qt.AlignVCenter
-                            radius: 34
+                            radius: 28
                             color: MusicState.m3SurfaceContainer
 
                             Image {
+                                id: islandArtImg
                                 anchors.fill: parent
                                 source: MusicState.artUrl
                                 fillMode: Image.PreserveAspectCrop
                                 asynchronous: true
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                visible: islandArtImg.status !== Image.Ready
+                                text: "♫"
+                                color: MusicState.m3OnSurfaceVariant
+                                opacity: 0.45
+                                font.pixelSize: 38
                             }
 
                             MouseArea {
@@ -598,43 +636,46 @@ Item {
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            spacing: 6
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 8
 
-                            Text {
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                text: MusicState.hasTrack ? MusicState.trackTitle : "Ничего не играет"
-                                color: MusicState.m3OnSurface
-                                font.family: MusicState.fontUi
-                                font.pixelSize: 16
-                                font.weight: Font.Bold
-                                elide: Text.ElideRight
-                            }
+                                spacing: 2
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: MusicState.hasTrack
-                                    ? (MusicState.trackArtist + (MusicState.trackAlbum ? " · " + MusicState.trackAlbum : ""))
-                                    : MusicState.currentPlatformObj.name
-                                color: MusicState.m3OnSurfaceVariant
-                                font.family: MusicState.fontUi
-                                font.pixelSize: 12
-                                elide: Text.ElideRight
-                            }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: MusicState.hasTrack ? MusicState.trackTitle : "Ничего не играет"
+                                    color: MusicState.m3OnSurface
+                                    font.family: MusicState.fontUi
+                                    font.pixelSize: 16
+                                    font.weight: Font.Bold
+                                    elide: Text.ElideRight
+                                }
 
-                            Item { Layout.fillHeight: true }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: MusicState.hasTrack
+                                        ? (MusicState.trackArtist + (MusicState.trackAlbum ? " · " + MusicState.trackAlbum : ""))
+                                        : MusicState.currentPlatformObj.name
+                                    color: MusicState.m3OnSurfaceVariant
+                                    font.family: MusicState.fontUi
+                                    font.pixelSize: 12
+                                    elide: Text.ElideRight
+                                }
+                            }
 
                             // Chubby Material 3 Expressive Wavy Scrubber
                             M3WavyBar {
                                 id: mediaProg
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 22
+                                Layout.preferredHeight: 20
                                 visible: MusicState.hasTrack && MusicState.trackLength > 0
                                 value: MusicState.trackLength > 0 ? (MusicState.livePosition / MusicState.trackLength) : 0
                                 activeColor: MusicState.m3Primary
                                 trackColor: MusicState.m3SurfaceContainer
-                                lineWidth: 6.0
-                                amplitude: 3.8
+                                lineWidth: 5.5
+                                amplitude: 3.4
                                 animated: MusicState.isPlaying && root.isExpanded && root.currentTab === 1
                                 onMoved: function(ratio) {
                                     if (MusicState.trackLength > 0) {
@@ -645,8 +686,8 @@ Item {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Layout.topMargin: 4
-                                spacing: 10
+                                Layout.topMargin: 2
+                                spacing: 12
 
                                 Rectangle {
                                     Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 19
@@ -660,8 +701,8 @@ Item {
                                 }
 
                                 Item {
-                                    Layout.preferredWidth: 48
-                                    Layout.preferredHeight: 48
+                                    Layout.preferredWidth: 46
+                                    Layout.preferredHeight: 46
                                     M3Shape {
                                         anchors.fill: parent
                                         shape: "cookie12"
@@ -692,78 +733,318 @@ Item {
                                 }
 
                                 Item { Layout.fillWidth: true }
+                            }
+                        }
 
-                                Rectangle {
-                                    Layout.preferredWidth: 32; Layout.preferredHeight: 32; radius: 16
-                                    color: cMa.containsMouse ? MusicState.m3SurfaceContainerHighest : "transparent"
-                                    SysIcon { anchors.centerIn: parent; name: "close"; size: 15; color: MusicState.m3OnSurfaceVariant }
-                                    MouseArea { id: cMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: NotifState.islandExpanded = false }
+                        // Synced Lyrics Pane with soft bottom fade (never hard-clips half lines!)
+                        Rectangle {
+                            visible: root._mediaHasLyrics
+                            Layout.preferredWidth: 214
+                            Layout.fillHeight: true
+                            radius: 16
+                            color: MusicState.m3SurfaceContainer
+                            clip: true
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 12
+                                spacing: 6
+
+                                Text {
+                                    text: "Текст песни"
+                                    color: MusicState.m3Primary
+                                    font.family: MusicState.fontUi
+                                    font.pixelSize: 11
+                                    font.weight: Font.Bold
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    clip: true
+
+                                    ListView {
+                                        id: islandLyricsList
+                                        anchors.fill: parent
+                                        bottomMargin: 16
+                                        spacing: 6
+                                        model: MusicState.lyricsLines
+                                        currentIndex: Math.max(0, MusicState.currentLyricIndex)
+                                        highlightFollowsCurrentItem: true
+                                        preferredHighlightBegin: height * 0.28
+                                        preferredHighlightEnd: height * 0.48
+                                        highlightRangeMode: ListView.ApplyRange
+
+                                        delegate: Text {
+                                            required property var modelData
+                                            required property int index
+                                            readonly property bool isCur: index === MusicState.currentLyricIndex
+                                            width: islandLyricsList.width
+                                            text: modelData.text || ""
+                                            color: isCur ? MusicState.m3Primary : MusicState.m3OnSurfaceVariant
+                                            opacity: isCur ? 1.0 : 0.62
+                                            font.family: MusicState.fontUi
+                                            font.pixelSize: isCur ? 12 : 11
+                                            font.weight: isCur ? Font.Bold : Font.Normal
+                                            wrapMode: Text.Wrap
+                                            Behavior on opacity { NumberAnimation { duration: 180 } }
+                                        }
+                                    }
+
+                                    // Soft bottom fade mask so lyrics fade smoothly instead of slicing text in half
+                                    Rectangle {
+                                        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                        height: 22
+                                        gradient: Gradient {
+                                            GradientStop { position: 0.0; color: "transparent" }
+                                            GradientStop { position: 1.0; color: MusicState.m3SurfaceContainer }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // === TAB 2: PERFORMANCE (3 Chubby Circular Wavy Gauges) ===
-                RowLayout {
+                // === TAB 2: PERFORMANCE (3 Chubby Circular Wavy Gauges + Live Network Speed) ===
+                ColumnLayout {
                     anchors.fill: parent
-                    spacing: 12
-                    visible: root.currentTab === 2
+                    spacing: 10
+                    opacity: root.currentTab === 2 ? 1.0 : 0.0
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
 
-                    Repeater {
-                        model: ["CPU", "RAM", "Disk"]
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        spacing: 10
 
-                        delegate: Rectangle {
-                            id: gaugeCard
-                            readonly property real metricPct: index === 0 ? SystemState.cpuPercent : (index === 1 ? SystemState.ramPercent : SystemState.diskPercent)
-                            readonly property string metricSub: index === 0 ? "Процессор" : (index === 1 ? SystemState.ramText : SystemState.diskText)
+                        Repeater {
+                            model: ["CPU", "RAM", "Disk"]
 
-                            Layout.fillWidth: true
-                            Layout.fillHeight: true
-                            radius: 22
-                            color: MusicState.m3SurfaceContainerHigh
-                            clip: true
+                            delegate: Rectangle {
+                                id: gaugeCard
+                                required property string modelData
+                                required property int index
+                                readonly property real metricPct: index === 0 ? SystemState.cpuPercent : (index === 1 ? SystemState.ramPercent : SystemState.diskPercent)
+                                readonly property string metricSub: index === 0 ? "Процессор" : (index === 1 ? SystemState.ramText : SystemState.diskText)
 
-                            M3Shape {
-                                width: 110; height: 110
-                                anchors.centerIn: parent
-                                anchors.verticalCenterOffset: -14
-                                shape: "clover4"
-                                fillColor: MusicState.m3Primary
-                                opacity: 0.06
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                radius: 20
+                                color: MusicState.m3SurfaceContainerHigh
+                                clip: true
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 5
+
+                                    M3WavyGauge {
+                                        Layout.preferredWidth: 78
+                                        Layout.preferredHeight: 78
+                                        Layout.alignment: Qt.AlignHCenter
+                                        percent: gaugeCard.metricPct
+                                        activeColor: MusicState.m3Primary
+                                        trackColor: MusicState.m3SurfaceContainer
+                                        lineWidth: 7.0
+                                        amplitude: 2.2
+                                        animated: root.isExpanded && root.currentTab === 2
+                                    }
+
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: modelData + " · " + Math.round(gaugeCard.metricPct) + "%"
+                                        color: MusicState.m3OnSurface
+                                        font.family: MusicState.fontUi
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                    }
+
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: gaugeCard.metricSub
+                                        color: MusicState.m3OnSurfaceVariant
+                                        font.family: MusicState.fontUi
+                                        font.pixelSize: 10
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Live Network Speed Pill (reads /proc/net/dev — zero Wi-Fi scans!)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 38
+                        radius: 19
+                        color: MusicState.m3SurfaceContainerHigh
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 16
+                            anchors.rightMargin: 16
+                            spacing: 12
+
+                            SysIcon {
+                                name: SystemState.ethernetConnected ? "ethernet" : "wifi"
+                                size: 15
+                                color: MusicState.m3Primary
+                            }
+                            Text {
+                                text: SystemState.ethernetConnected ? "Ethernet" : (SystemState.wifiSsid || "Сеть")
+                                color: MusicState.m3OnSurface
+                                font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.SemiBold
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            Text {
+                                text: "↓ " + SystemState.netDown
+                                color: MusicState.m3Primary
+                                font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold
+                            }
+                            Text {
+                                text: "↑ " + SystemState.netUp
+                                color: MusicState.m3OnSurfaceVariant
+                                font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.SemiBold
+                            }
+                        }
+                    }
+                }
+
+                // === TAB 3: WEATHER (Caelestia-style Full Forecast Tab) ===
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 10
+                    opacity: root.currentTab === 3 ? 1.0 : 0.0
+                    visible: opacity > 0.01
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                    // Top Weather Summary Card
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 112
+                        radius: 20
+                        color: MusicState.m3SurfaceContainerHigh
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 14
+
+                            Item {
+                                Layout.preferredWidth: 56
+                                Layout.preferredHeight: 56
+                                M3Shape {
+                                    anchors.fill: parent
+                                    shape: "cookie6"
+                                    fillColor: MusicState.m3PrimaryContainer
+                                    spin: root.isExpanded && root.currentTab === 3
+                                    spinDuration: 22000
+                                }
+                                SysIcon {
+                                    anchors.centerIn: parent
+                                    name: "weather"
+                                    size: 24
+                                    color: MusicState.m3OnPrimaryContainer
+                                }
                             }
 
                             ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 8
-
-                                M3WavyGauge {
-                                    Layout.preferredWidth: 88
-                                    Layout.preferredHeight: 88
-                                    Layout.alignment: Qt.AlignHCenter
-                                    percent: gaugeCard.metricPct
-                                    activeColor: MusicState.m3Primary
-                                    trackColor: MusicState.m3SurfaceContainer
-                                    lineWidth: 7.5
-                                    amplitude: 2.5
-                                    animated: root.isExpanded && root.currentTab === 2
-                                }
-
+                                Layout.fillWidth: true
+                                spacing: 2
                                 Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: modelData
+                                    text: SystemState.weatherCity || "Погода"
                                     color: MusicState.m3OnSurface
-                                    font.family: MusicState.fontUi
-                                    font.pixelSize: 13
-                                    font.weight: Font.Bold
+                                    font.family: MusicState.fontUi; font.pixelSize: 14; font.weight: Font.Bold
+                                    elide: Text.ElideRight
                                 }
+                                RowLayout {
+                                    spacing: 8
+                                    Text {
+                                        text: SystemState.weatherTemp || "—"
+                                        color: MusicState.m3Primary
+                                        font.family: MusicState.fontUi; font.pixelSize: 30; font.weight: Font.Black
+                                    }
+                                    Text {
+                                        text: SystemState.weatherDesc || "Загрузка..."
+                                        color: MusicState.m3OnSurfaceVariant
+                                        font.family: MusicState.fontUi; font.pixelSize: 12
+                                        elide: Text.ElideRight
+                                        Layout.fillWidth: true
+                                    }
+                                }
+                            }
 
+                            ColumnLayout {
+                                spacing: 4
                                 Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: gaugeCard.metricSub
+                                    visible: SystemState.weatherHumidity !== ""
+                                    text: "Влажность: " + SystemState.weatherHumidity
                                     color: MusicState.m3OnSurfaceVariant
-                                    font.family: MusicState.fontUi
-                                    font.pixelSize: 10
+                                    font.family: MusicState.fontUi; font.pixelSize: 11
+                                }
+                                Text {
+                                    visible: SystemState.weatherFeels !== ""
+                                    text: "Ощущается: " + SystemState.weatherFeels
+                                    color: MusicState.m3OnSurfaceVariant
+                                    font.family: MusicState.fontUi; font.pixelSize: 11
+                                }
+                                Text {
+                                    visible: SystemState.weatherWind !== ""
+                                    text: "Ветер: " + SystemState.weatherWind
+                                    color: MusicState.m3OnSurfaceVariant
+                                    font.family: MusicState.fontUi; font.pixelSize: 11
+                                }
+                            }
+                        }
+                    }
+
+                    // 3-Day Forecast Row
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        spacing: 10
+
+                        Repeater {
+                            model: SystemState.weatherForecast.length > 0
+                                ? SystemState.weatherForecast
+                                : [
+                                    { date: "Сегодня", min: "—", max: "—", desc: "Обновление..." },
+                                    { date: "Завтра",  min: "—", max: "—", desc: "—" },
+                                    { date: "Послезавтра", min: "—", max: "—", desc: "—" }
+                                ]
+                            delegate: Rectangle {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                radius: 18
+                                color: MusicState.m3SurfaceContainerHigh
+
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    width: parent.width - 16
+                                    spacing: 4
+
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: modelData.date || ""
+                                        color: MusicState.m3Primary
+                                        font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: (modelData.max || "—") + " / " + (modelData.min || "—")
+                                        color: MusicState.m3OnSurface
+                                        font.family: MusicState.fontUi; font.pixelSize: 14; font.weight: Font.Black
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: modelData.desc || ""
+                                        color: MusicState.m3OnSurfaceVariant
+                                        font.family: MusicState.fontUi; font.pixelSize: 10
+                                        elide: Text.ElideRight
+                                    }
                                 }
                             }
                         }

@@ -25,10 +25,10 @@ Item {
         : 0
 
     readonly property bool desktopIsEmpty: !ShellConfig.videoEmptyDesktopOnly || openWindowCount === 0
-    readonly property bool shouldPlay: streamUrl !== "" && MusicState.isPlaying && desktopIsEmpty
+    readonly property bool shouldPlay: streamUrl !== "" && MusicState.hasTrack && MusicState.isPlaying && desktopIsEmpty
 
     function syncPlayback() {
-        if (streamUrl === "") {
+        if (streamUrl === "" || !MusicState.hasTrack) {
             player.stop()
             player.source = ""
             return
@@ -48,6 +48,11 @@ Item {
     onShouldPlayChanged: syncPlayback()
     Component.onCompleted: syncPlayback()
 
+    Connections {
+        target: MusicState
+        function onHasTrackChanged() { root.syncPlayback() }
+    }
+
     MediaPlayer {
         id: player
         loops: MediaPlayer.Infinite
@@ -58,7 +63,7 @@ Item {
         }
 
         onErrorOccurred: function(error, errorString) {
-            console.warn("AmbientMusicShell VideoPlayerCore error:", error, errorString)
+            console.warn("AruShell VideoPlayerCore error:", error, errorString)
         }
     }
 
@@ -67,10 +72,10 @@ Item {
         anchors.fill: parent
         fillMode: VideoOutput.PreserveAspectCrop
         orientation: MusicState.videoRotation
-        opacity: (root.streamUrl !== "" && root.desktopIsEmpty && player.playbackState !== MediaPlayer.StoppedState) ? 1.0 : 0.0
+        opacity: (root.streamUrl !== "" && MusicState.hasTrack && player.playbackState !== MediaPlayer.StoppedState) ? 1.0 : 0.0
 
         Behavior on opacity {
-            NumberAnimation { duration: 450; easing.type: Easing.InOutCubic }
+            NumberAnimation { duration: 420; easing.type: Easing.InOutCubic }
         }
     }
 }

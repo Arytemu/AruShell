@@ -157,17 +157,18 @@ Row {
         }
     }
 
-    // 2. Modern System Settings Pill (Wi-Fi + Bluetooth + Volume + optional Battery)
+    // 2. Modern System Settings Pill (dynamically resizes to active user-selected indicators)
     Rectangle {
         id: sysPill
         height: 36
-        width: sysRow.implicitWidth + 24
+        width: Math.max(40, Math.round(sysRow.implicitWidth + ShellConfig.pillPadding))
         y: (root.height - height) / 2
         radius: 18
         color: SystemState.quickSettingsOpen
             ? MusicState.m3PrimaryContainer
             : (sysMa.containsMouse ? MusicState.m3SurfaceContainerHigh : MusicState.m3SurfaceContainer)
         Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on width { M3Anim { duration: 260 } }
 
         readonly property color fgCol: SystemState.quickSettingsOpen
             ? MusicState.m3OnPrimaryContainer
@@ -176,41 +177,62 @@ Row {
         RowLayout {
             id: sysRow
             anchors.centerIn: parent
-            spacing: 10
+            spacing: ShellConfig.pillSpacing
 
             SysIcon {
+                visible: ShellConfig.hasPillItem("wifi")
                 name: SystemState.ethernetConnected ? "ethernet" : (SystemState.wifiEnabled ? "wifi" : "wifi_off")
-                size: 16
+                size: ShellConfig.pillIconSize
                 color: sysPill.fgCol
                 opacity: (SystemState.wifiEnabled || SystemState.ethernetConnected) ? 1.0 : 0.45
                 Layout.alignment: Qt.AlignVCenter
             }
 
             SysIcon {
+                visible: ShellConfig.hasPillItem("bt")
                 name: SystemState.btEnabled ? "bluetooth" : "bluetooth_off"
-                size: 16
+                size: ShellConfig.pillIconSize
                 color: sysPill.fgCol
                 opacity: SystemState.btEnabled ? 1.0 : 0.45
                 Layout.alignment: Qt.AlignVCenter
             }
 
             SysIcon {
+                visible: ShellConfig.hasPillItem("volume")
                 name: (SystemState.muted || SystemState.volume === 0)
                     ? "volume_mute"
                     : (SystemState.volume < 45 ? "volume_low" : "volume_high")
-                size: 16
+                size: ShellConfig.pillIconSize
                 color: sysPill.fgCol
                 Layout.alignment: Qt.AlignVCenter
             }
 
+            SysIcon {
+                visible: ShellConfig.hasPillItem("nightLight")
+                name: "moon"
+                size: Math.max(12, ShellConfig.pillIconSize - 1)
+                color: sysPill.fgCol
+                opacity: SystemState.nightLight ? 1.0 : 0.42
+                Layout.alignment: Qt.AlignVCenter
+            }
+
+            SysIcon {
+                visible: ShellConfig.hasPillItem("gameMode")
+                name: "apps"
+                size: Math.max(12, ShellConfig.pillIconSize - 1)
+                color: SystemState.gameMode ? MusicState.m3Primary : sysPill.fgCol
+                opacity: SystemState.gameMode ? 1.0 : 0.42
+                Layout.alignment: Qt.AlignVCenter
+            }
+
             RowLayout {
-                visible: SystemState.hasBattery
+                visible: ShellConfig.hasPillItem("battery") && SystemState.hasBattery
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 4
 
                 SysIcon {
                     name: SystemState.batteryCharging ? "battery_charging" : "battery"
-                    size: 16
+                    size: ShellConfig.pillIconSize
                     color: sysPill.fgCol
                     Layout.alignment: Qt.AlignVCenter
                 }
@@ -219,7 +241,7 @@ Row {
                     text: SystemState.batteryPercent + "%"
                     color: sysPill.fgCol
                     font.family: MusicState.fontUi
-                    font.pixelSize: 11
+                    font.pixelSize: Math.max(10, ShellConfig.pillIconSize - 4)
                     font.weight: Font.Bold
                     Layout.alignment: Qt.AlignVCenter
                 }

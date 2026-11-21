@@ -184,6 +184,7 @@ rm -rf "${TARGET_DIR}/shaders" \
 
 cp -r "${SCRIPT_DIR}/." "${TARGET_DIR}/"
 chmod +x "${TARGET_DIR}/services/backend.py" \
+         "${TARGET_DIR}/services/extract_color.py" \
          "${TARGET_DIR}/services/sysinfo.sh" \
          "${TARGET_DIR}/services/screenshot.sh" \
          "${TARGET_DIR}/auth_yandex.py" \
@@ -281,7 +282,7 @@ for cfg_path in all_cfgs:
         is_bind = ("hl.bind" in s or ".bind(" in s) if is_lua else bool(re.match(r"^bind[a-z]*\s*=", s))
         has_print = bool(re.search(r"\b(Print|code:107)\b", s, re.IGNORECASE))
         has_super_shift_s = bool(re.search(r"SHIFT.*?\bS\b", s, re.IGNORECASE)) and bool(re.search(r"(SUPER|mainMod|MOD)", s, re.IGNORECASE))
-        has_old_shot_cmd = any(k in s.lower() for k in ("rice-hotcorner shot", ".local/bin/screenshot", "dms screenshot", "grimblast", "hyprshot", "flameshot"))
+        has_old_shot_cmd = any(k in s.lower() for k in ("rice-hotcorner shot", ".local/bin/screenshot", "dms screenshot", "grimblast", "hyprshot", "flameshot", "rice-lock", "dms ipc call lock", "rice-dashboard wallpaper", "hyprquickpaper", "rice-bar start", "rice-walls awww", "rice-notifyd", "rice-desktop start"))
         if (is_bind and (has_print or has_super_shift_s)) or has_old_shot_cmd:
             new_lines.append(f"{cmt} [disabled by AruShell] {line}")
             print(f"  [OFF] Отключён старый бинд в {cfg_path}: {s}")
@@ -308,12 +309,20 @@ pcall(function() hl.unbind("PRINT") end)
 pcall(function() hl.unbind("SHIFT + Print") end)
 pcall(function() hl.unbind("SUPER + SUPER_L") end)
 pcall(function() hl.unbind("SUPER + V") end)
+pcall(function() hl.unbind("SUPER + W") end)
+pcall(function() hl.unbind("SUPER + L") end)
+pcall(function() hl.unbind("SUPER + l") end)
 hl.bind("SUPER + SUPER_L", hl.dsp.exec_cmd("quickshell ipc -c AruShell call launcher toggle"), { release = true })
 hl.bind("SUPER + V", hl.dsp.exec_cmd("quickshell ipc -c AruShell call clipboard toggle"))
+hl.bind("SUPER + W", hl.dsp.exec_cmd("quickshell ipc -c AruShell call wallpaper toggle"))
+hl.bind("SUPER + L", hl.dsp.exec_cmd("quickshell ipc -c AruShell call lock lock"))
 hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("quickshell ipc -c AruShell call screenshot open"))
 hl.bind("Print", hl.dsp.exec_cmd("quickshell ipc -c AruShell call screenshot open"))
 hl.bind("SHIFT + Print", hl.dsp.exec_cmd("quickshell ipc -c AruShell call screenshot full"))
 hl.window_rule({ name = "arushell-screenshot-editor-float", match = { class = "^(com\\\\.gabm\\\\.satty|satty|swappy)$" }, float = true, center = true })
+hl.exec_cmd("sh -c 'sleep 0.8; pgrep -x quickshell >/dev/null || nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &'")
+hl.exec_cmd("pgrep -x hypridle >/dev/null || nohup hypridle >/dev/null 2>&1 &")
+hl.exec_cmd("pgrep -f cliphist >/dev/null || wl-paste --watch cliphist store")
 -- end AruShell binds
 """
     with open(lua_main, "w", encoding="utf-8") as fh:
@@ -332,6 +341,8 @@ unbind = SHIFT, Print
 unbind = SUPER, V
 bindr = SUPER, SUPER_L, exec, quickshell ipc -c AruShell call launcher toggle
 bind = SUPER, V, exec, quickshell ipc -c AruShell call clipboard toggle
+bind = SUPER, W, exec, quickshell ipc -c AruShell call wallpaper toggle
+bind = SUPER, L, exec, quickshell ipc -c AruShell call lock lock
 bind = SUPER SHIFT, S, exec, quickshell ipc -c AruShell call screenshot open
 bind = , Print, exec, quickshell ipc -c AruShell call screenshot open
 bind = SHIFT, Print, exec, quickshell ipc -c AruShell call screenshot full
@@ -345,6 +356,23 @@ windowrulev2 = center, class:^(com\\.gabm\\.satty|satty|swappy)$
         fh.write(txt.rstrip() + "\n" + block)
     print(f"  [OK] Бинды и правила записаны в {conf_main}")
 PYEOF
+        cat > "${HYPR_DIR}/hypridle.conf" <<'IDLEEOF'
+general {
+    lock_cmd = quickshell ipc -c AruShell call lock lock
+    before_sleep_cmd = quickshell ipc -c AruShell call lock lock
+    after_sleep_cmd = hyprctl dispatch dpms on
+}
+
+listener {
+    timeout = 600
+    on-timeout = quickshell ipc -c AruShell call lock lock
+}
+IDLEEOF
+        echo "  [OK] Настроен автолок через 10 минут бездействия (${HYPR_DIR}/hypridle.conf)"
+        if command -v hypridle >/dev/null 2>&1; then
+            pkill -x hypridle 2>/dev/null || true
+            nohup hypridle >/dev/null 2>&1 &
+        fi
         hyprctl reload >/dev/null 2>&1 || true
     fi
 fi
@@ -370,7 +398,9 @@ rm -rf "${HOME}/.cache/quickshell/qmlcache" 2>/dev/null || true
 if command -v quickshell >/dev/null 2>&1; then
     echo ""
     echo "==> Запускаю AruShell..."
-    nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &
+    if ! pgrep -x quickshell >/dev/null 2>&1; then
+        nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &
+    fi
     echo -e "${C_OK}Готово! AruShell запущен (лог: /tmp/arushell.log).${C_RST}"
 else
     echo -e "${C_WRN}Файлы AruShell установлены в ${TARGET_DIR}. Установите quickshell и запустите: quickshell -c AruShell${C_RST}"

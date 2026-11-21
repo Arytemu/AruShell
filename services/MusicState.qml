@@ -97,28 +97,150 @@ Singleton {
 
     readonly property var currentPlatformObj: platformInfo(selectedPlatform)
 
+    readonly property var _hardBrowserBlocklist: [
+        "firefox", "brave", "vivaldi", "opera", "zen", "librewolf",
+        "edge", "floorp", "waterfox", "thorium", "kdeconnect"
+    ]
+
+    readonly property var _messengerBlocklist: [
+        "telegram", "discord", "vesktop", "whatsapp", "slack",
+        "element", "vk мессенджер", "google meet", "zoom"
+    ]
+
+    readonly property var _nativeClientKeys: ({
+        "yandex":  ["yandex", "yamusic", "яндекс"],
+        "spotify": ["spotify", "ncspot", "spotify_player", "spotifyd"],
+        "apple":   ["cider", "apple-music", "applemusic"],
+        "ytmusic": ["youtube-music", "ytmdesktop", "pear", "th-ch", "ytm"],
+        "tidal":   ["tidal"],
+        "deezer":  ["deezer"],
+        "mpd":     ["mpd", "mpdris", "rhythmbox", "lollypop", "amberol", "elisa", "strawberry", "clementine", "audacious", "deadbeef", "cmus", "feishin", "supersonic", "g4music", "gapless", "harmonoid", "nuclear", "vlc"]
+    })
+
+    function _playerHay(pl) {
+        return ((pl.identity || "") + " " + (pl.dbusName || "") + " " + (pl.desktopEntry || "")).toLowerCase()
+    }
+
+    function _matchesAnyKey(hay, keys) {
+        for (let i = 0; i < keys.length; i++) {
+            if (keys[i] && hay.indexOf(keys[i]) !== -1) return true
+        }
+        return false
+    }
+
+    function _isMessenger(pl) {
+        const txt = ((pl.identity || "") + " " + (pl.trackTitle || "") + " " + (pl.desktopEntry || "")).toLowerCase()
+        return _matchesAnyKey(txt, _messengerBlocklist)
+    }
+
+    function _isElectronMusicPlayer(pl) {
+        const hay = _playerHay(pl)
+        if (_matchesAnyKey(hay, _hardBrowserBlocklist) || _isMessenger(pl)) return false
+        if (hay.indexOf("chromium") === -1 && hay.indexOf("electron") === -1) return false
+        const art = String(pl.trackArtUrl || "").toLowerCase()
+        const artist = String(pl.trackArtist || "").trim()
+        const title = String(pl.trackTitle || "").trim()
+        if (art.indexOf("yandex") !== -1 || art.indexOf("music") !== -1 || art.indexOf("spotify") !== -1) return true
+        return artist !== "" && title !== ""
+    }
+
+    readonly property string detectedMprisList: {
+        const list = Mpris.players.values
+        if (!list || list.length === 0) return "нет активных"
+        const names = []
+        for (let i = 0; i < list.length; i++) {
+            const p = list[i]
+            const lbl = (p.identity || p.desktopEntry || p.dbusName || "unknown")
+            if (names.indexOf(lbl) === -1) names.push(lbl)
+        }
+        return names.join(", ")
+    }
+
     readonly property var activeMprisPlayer: {
         const list = Mpris.players.values
         if (!list || list.length === 0) return null
 
-        if (selectedPlatform !== "automatic") {
-            const pObj = platformInfo(selectedPlatform)
-            const keys = pObj.match || []
+        const mode = ShellConfig.musicClientMode || "auto"
+
+        if (mode === "custom") {
+            const raw = (ShellConfig.musicCustomClient || "").trim().toLowerCase()
+            if (!raw) return null
+            const keys = raw.split(",").map(function(s) { return s.trim() }).filter(function(s) { return s.length > 0 })
+            let fallback = null
             for (let i = 0; i < list.length; i++) {
                 const pl = list[i]
-                const hay = ((pl.identity || "") + " " + (pl.dbusName || "") + " " + (pl.desktopEntry || "")).toLowerCase()
-                for (let k = 0; k < keys.length; k++) {
-                    if (hay.indexOf(keys[k]) !== -1) return pl
+                if (_matchesAnyKey(_playerHay(pl), keys)) {
+                    if (pl.isPlaying) return pl
+                    if (!fallback) fallback = pl
                 }
             }
+            return fallback
         }
 
+        if (mode !== "auto" && _nativeClientKeys[mode]) {
+            const keys = _nativeClientKeys[mode]
+            let fallback = null
+            // Pass 1: direct identity / dbus / desktopEntry match
+            for (let i = 0; i < list.length; i++) {
+                const pl = list[i]
+                const hay = _playerHay(pl)
+                if (_isMessenger(pl)) continue
+                if (_matchesAnyKey(hay, keys)) {
+                    if (pl.isPlaying) return pl
+                    if (!fallback) fallback = pl
+                }
+            }
+            if (fallback) return fallback
+            // Pass 2: Electron clients (e.g. Yandex Music / YT Music / Tidal) exposing chromium.instance*
+            if (mode === "yandex" || mode === "ytmusic" || mode === "tidal" || mode === "deezer" || mode === "apple") {
+                for (let i = 0; i < list.length; i++) {
+                    const pl = list[i]
+                    if (!_isElectronMusicPlayer(pl)) continue
+                    const art = String(pl.trackArtUrl || "").toLowerCase()
+                    if (mode === "yandex" && (art.indexOf("yandex") !== -1 || String(pl.trackArtist || "").trim() !== "")) {
+                        if (pl.isPlaying) return pl
+                        if (!fallback) fallback = pl
+                    } else if (mode !== "yandex") {
+                        if (pl.isPlaying) return pl
+                        if (!fallback) fallback = pl
+                    }
+                }
+            }
+            return fallback
+        }
+
+        // Auto mode:
+        // Pass 1: explicit native music clients (checked BEFORE browser filter)
+        const allKeys = []
+        const groups = Object.keys(_nativeClientKeys)
+        for (let g = 0; g < groups.length; g++) {
+            const arr = _nativeClientKeys[groups[g]]
+            for (let j = 0; j < arr.length; j++) allKeys.push(arr[j])
+        }
+        allKeys.push("soundcloud", "zvuk", "vk-music", "music")
+
+        let fallback = null
         for (let i = 0; i < list.length; i++) {
-            if (list[i].isPlaying) return list[i]
+            const pl = list[i]
+            const hay = _playerHay(pl)
+            if (_isMessenger(pl) || _matchesAnyKey(hay, _hardBrowserBlocklist)) continue
+            if (_matchesAnyKey(hay, allKeys)) {
+                if (pl.isPlaying) return pl
+                if (!fallback) fallback = pl
+            }
         }
-        return list[0]
-    }
+        if (fallback) return fallback
 
+        // Pass 2: Electron music apps registered as chromium.instance* (Yandex Music, YT Music, etc.)
+        for (let i = 0; i < list.length; i++) {
+            const pl = list[i]
+            if (_isElectronMusicPlayer(pl)) {
+                if (pl.isPlaying) return pl
+                if (!fallback) fallback = pl
+            }
+        }
+        return fallback
+    }
     Connections {
         target: root.activeMprisPlayer
         function onIsPlayingChanged() {
@@ -158,44 +280,92 @@ Singleton {
     // Material You (Material Design 3 Dynamic Color Palette from Album Art)
     // =========================================================================
     ColorQuantizer {
+        id: wallQuantizer
+        source: ShellConfig.wallpaperPath ? ("file://" + ShellConfig.wallpaperPath) : ""
+        depth: 4
+        rescaleSize: 64
+    }
+
+    ColorQuantizer {
         id: quantizer
         source: root.artUrl
         depth: 4
         rescaleSize: 64
     }
 
-    readonly property color seedColor: {
-        const cols = quantizer.colors
-        if (cols && cols.length > 0) {
-            let best = cols[0]
-            let bestScore = -1
-            for (let i = 0; i < cols.length; i++) {
-                const c = cols[i]
-                const score = c.hslSaturation * 1.5 + (1.0 - Math.abs(c.hslLightness - 0.52))
-                if (score > bestScore) {
-                    bestScore = score
-                    best = c
-                }
+    function pickBestColor(cols) {
+        if (!cols || cols.length === 0) return null
+        let best = cols[0]
+        let bestScore = -1
+        for (let i = 0; i < cols.length; i++) {
+            const c = cols[i]
+            if (!c) continue
+            const score = c.hslSaturation * 1.8 + (1.0 - Math.abs(c.hslLightness - 0.52))
+            if (score > bestScore) {
+                bestScore = score
+                best = c
             }
-            return best
         }
+        return best
+    }
+
+    // Extracted vibrant dominant hex color from current wallpaper (populated by WallpaperState)
+    property string wallSeedHex: ""
+
+    // Dynamic Material You seed: manual override -> extracted wallpaper color -> wallQuantizer -> album art -> fallback
+    readonly property color seedColor: {
+        if (ShellConfig.accentOverride !== "") {
+            return Qt.color(ShellConfig.accentOverride)
+        }
+        if (ShellConfig.wallpaperPath !== "" && root.wallSeedHex !== "") {
+            return Qt.color(root.wallSeedHex)
+        }
+        const wc = pickBestColor(wallQuantizer.colors)
+        if (ShellConfig.wallpaperPath !== "" && wc) {
+            return wc
+        }
+        const ac = pickBestColor(quantizer.colors)
+        if (ac) return ac
         return Qt.color(currentPlatformObj.accent || "#D0BCFF")
     }
 
     readonly property real _seedHue: seedColor.hslHue >= 0 ? seedColor.hslHue : 0.72
     readonly property real _seedSat: Math.max(0.28, Math.min(0.85, seedColor.hslSaturation))
 
-    // Animated Material 3 tonal tokens
-    property color m3Primary: Qt.hsla(_seedHue, Math.min(0.76, _seedSat + 0.12), 0.78, 1.0)
-    property color m3OnPrimary: Qt.hsla(_seedHue, Math.min(0.55, _seedSat), 0.15, 1.0)
-    property color m3PrimaryContainer: Qt.hsla(_seedHue, Math.min(0.52, _seedSat * 0.85), 0.27, 0.94)
-    property color m3OnPrimaryContainer: Qt.hsla(_seedHue, Math.min(0.65, _seedSat), 0.91, 1.0)
-    property color m3SurfaceContainer: Qt.hsla(_seedHue, Math.min(0.18, _seedSat * 0.30), 0.12, 0.90)
-    property color m3SurfaceContainerHigh: Qt.hsla(_seedHue, Math.min(0.20, _seedSat * 0.34), 0.18, 0.92)
-    property color m3SurfaceContainerHighest: Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.38), 0.24, 0.94)
-    property color m3OnSurface: Qt.hsla(_seedHue, 0.10, 0.94, 1.0)
-    property color m3OnSurfaceVariant: Qt.hsla(_seedHue, 0.12, 0.74, 1.0)
-    property color m3OutlineVariant: Qt.hsla(_seedHue, 0.16, 0.34, 0.32)
+    readonly property bool _dark: ShellConfig.darkTheme
+    readonly property real _op: Math.max(0.65, Math.min(1.0, ShellConfig.panelOpacity))
+
+    // Animated Material 3 tonal tokens (supports Dark & Light theme + live transparency)
+    property color m3Primary: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.76, _seedSat + 0.12), 0.78, 1.0)
+        : Qt.hsla(_seedHue, Math.min(0.72, _seedSat + 0.10), 0.38, 1.0)
+    property color m3OnPrimary: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.55, _seedSat), 0.15, 1.0)
+        : Qt.hsla(_seedHue, 0.10, 0.98, 1.0)
+    property color m3PrimaryContainer: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.52, _seedSat * 0.85), 0.27, Math.min(1.0, _op + 0.03))
+        : Qt.hsla(_seedHue, Math.min(0.60, _seedSat * 0.80), 0.86, Math.min(1.0, _op + 0.03))
+    property color m3OnPrimaryContainer: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.65, _seedSat), 0.91, 1.0)
+        : Qt.hsla(_seedHue, Math.min(0.65, _seedSat), 0.16, 1.0)
+    property color m3SurfaceContainer: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.28, _seedSat * 0.45), 0.12, _op)
+        : Qt.hsla(_seedHue, Math.min(0.24, _seedSat * 0.35), 0.94, _op)
+    property color m3SurfaceContainerHigh: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.30, _seedSat * 0.48), 0.18, Math.min(1.0, _op + 0.02))
+        : Qt.hsla(_seedHue, Math.min(0.24, _seedSat * 0.35), 0.89, Math.min(1.0, _op + 0.02))
+    property color m3SurfaceContainerHighest: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.38), 0.24, Math.min(1.0, _op + 0.03))
+        : Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.32), 0.84, Math.min(1.0, _op + 0.03))
+    property color m3OnSurface: _dark
+        ? Qt.hsla(_seedHue, 0.10, 0.94, 1.0)
+        : Qt.hsla(_seedHue, 0.14, 0.12, 1.0)
+    property color m3OnSurfaceVariant: _dark
+        ? Qt.hsla(_seedHue, 0.12, 0.74, 1.0)
+        : Qt.hsla(_seedHue, 0.12, 0.34, 1.0)
+    property color m3OutlineVariant: _dark
+        ? Qt.hsla(_seedHue, 0.16, 0.34, 0.32)
+        : Qt.hsla(_seedHue, 0.16, 0.65, 0.42)
 
     // Backwards-compatible aliases
     readonly property color accentColor: m3Primary

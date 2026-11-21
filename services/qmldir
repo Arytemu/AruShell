@@ -4,3 +4,5 @@ singleton SystemState 1.0 SystemState.qml
 singleton ScreenshotState 1.0 ScreenshotState.qml
 singleton ClipboardState 1.0 ClipboardState.qml
 singleton ShellConfig 1.0 ShellConfig.qml
+singleton WallpaperState 1.0 WallpaperState.qml
+singleton LockState 1.0 LockState.qml

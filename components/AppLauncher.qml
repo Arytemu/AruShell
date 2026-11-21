@@ -32,6 +32,7 @@ Item {
 
     readonly property var sysCommands: [
         { name: "Настройки шелла", desc: "Шейпы, шрифт, виджеты и панели", icon: "settings",   action: "settings" },
+        { name: "Обои",           desc: "Карусель выбора обоев (Win+W)",   icon: "palette",    action: "wallpaper" },
         { name: "Скриншот",       desc: "Снимок области, окна или экрана", icon: "screenshot", action: "screenshot" },
         { name: "Буфер обмена",   desc: "Открыть историю cliphist",        icon: "clipboard",  action: "clipboard" },
         { name: "Ночной режим",   desc: "Включить / выключить hyprsunset", icon: "nightlight", action: "nightlight" },
@@ -137,6 +138,7 @@ Item {
     function runSysCommand(action) {
         SystemState.launcherOpen = false
         if (action === "settings") ShellConfig.openSettings()
+        else if (action === "wallpaper") WallpaperState.toggle()
         else if (action === "screenshot") ScreenshotState.open("region")
         else if (action === "clipboard") ClipboardState.toggle()
         else if (action === "nightlight") SystemState.toggleNightLight()

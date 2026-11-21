@@ -10,7 +10,7 @@ sudo mkdir -p /usr/share/sddm/themes /etc/sddm.conf.d
 sudo rm -rf "${DST_THEME}"
 sudo cp -r "${SRC_THEME}" "${DST_THEME}"
 
-sudo tee /etc/sddm.conf.d/arushell-material-you.conf >/dev/null <<'EOF'
+sudo tee /etc/sddm.conf.d/zz-arushell.conf >/dev/null <<'EOF'
 [Theme]
 Current=arushell-material-you
 EOF

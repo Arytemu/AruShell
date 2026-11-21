@@ -11,7 +11,8 @@ case "${CMD}" in
     if command -v nmcli >/dev/null 2>&1; then
         ws="$(nmcli radio wifi 2>/dev/null || echo disabled)"
         [ "$ws" = "enabled" ] && wifi_en=1
-        wifi_ssid="$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}' || true)"
+        # NEVER call `nmcli dev wifi` in periodic status polling — it triggers off-channel Wi-Fi scans and causes ping spikes!
+        wifi_ssid="$(nmcli -t -f TYPE,NAME connection show --active 2>/dev/null | awk -F: '$1=="802-11-wireless"{print $2; exit}' || true)"
         eth_line="$(nmcli -t -f TYPE,STATE dev 2>/dev/null | awk -F: '$1=="ethernet" && $2=="connected"{print 1; exit}' || true)"
         [ "$eth_line" = "1" ] && eth_con=1
     fi
@@ -78,30 +79,61 @@ case "${CMD}" in
         power_prof="$(powerprofilesctl get 2>/dev/null || true)"
     fi
 
-    kbd_layout="EN"
+    kbd_raw=""
     if command -v hyprctl >/dev/null 2>&1; then
-        kbd_layout="$(hyprctl devices -j 2>/dev/null | python3 -c '
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    kbs = d.get("keyboards") or []
-    main = next((k for k in kbs if k.get("main")), kbs[0] if kbs else None)
-    km = (main.get("active_keymap") or "") if main else ""
-    low = km.lower()
-    if "russian" in low or low.startswith("ru"): print("RU")
-    elif "english" in low or "us" in low or low.startswith("en"): print("EN")
-    elif "ukrain" in low: print("UK")
-    elif "german" in low: print("DE")
-    elif "french" in low: print("FR")
-    elif km: print(km[:2].upper())
-    else: print("EN")
-except Exception:
-    print("EN")
-')"
+        kbd_raw="$(hyprctl devices -j 2>/dev/null || true)"
     fi
 
+    host_name="$(hostname 2>/dev/null || echo linux)"
+    kern_ver="$(uname -r 2>/dev/null || echo "")"
+    distro_name="$(. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-Linux}" || echo Linux)"
     python3 -c '
-import json, sys
+import json, os, sys, time
+
+# Lightweight local /proc/net/dev speed calculation (zero network/Wi-Fi overhead!)
+def read_net_bytes():
+    rx = tx = 0
+    try:
+        for line in open("/proc/net/dev"):
+            if ":" not in line: continue
+            iface, rest = line.split(":", 1)
+            iface = iface.strip()
+            if iface == "lo" or iface.startswith("docker") or iface.startswith("veth"):
+                continue
+            cols = rest.split()
+            if len(cols) >= 9:
+                rx += int(cols[0])
+                tx += int(cols[8])
+    except Exception:
+        pass
+    return rx, tx
+
+def fmt_bps(bps):
+    if bps >= 1024 * 1024:
+        return f"{bps / (1024 * 1024):.1f} MB/s"
+    if bps >= 1024:
+        return f"{bps / 1024:.0f} KB/s"
+    return f"{int(bps)} B/s"
+
+now = time.time()
+rx, tx = read_net_bytes()
+net_down = "0 KB/s"
+net_up = "0 KB/s"
+st_file = "/tmp/arushell_net_stat.json"
+try:
+    prev = json.load(open(st_file))
+    dt = max(0.2, now - float(prev.get("t", now - 2.5)))
+    drx = max(0, rx - int(prev.get("rx", rx)))
+    dtx = max(0, tx - int(prev.get("tx", tx)))
+    net_down = fmt_bps(drx / dt)
+    net_up = fmt_bps(dtx / dt)
+except Exception:
+    pass
+try:
+    json.dump({"t": now, "rx": rx, "tx": tx}, open(st_file, "w"))
+except Exception:
+    pass
+
 print(json.dumps({
     "wifiEnabled": sys.argv[1] == "1",
     "wifiSsid": sys.argv[2],
@@ -124,9 +156,14 @@ print(json.dumps({
     "userName": sys.argv[19],
     "nightLight": sys.argv[20] == "1",
     "powerProfile": sys.argv[21],
-    "kbdLayout": sys.argv[22]
+    "kbdLayout": (lambda raw: (lambda low, km: "RU" if ("russian" in low or low.startswith("ru")) else ("EN" if ("english" in low or "us" in low or low.startswith("en")) else ("UK" if "ukrain" in low else ("DE" if "german" in low else ("FR" if "french" in low else (km[:2].upper() if km else "EN"))))))(*(lambda kbs: (lambda main: ((main.get("active_keymap") or "").lower(), (main.get("active_keymap") or "")) if main else ("", ""))(next((k for k in kbs if k.get("main")), kbs[0] if kbs else None)))((json.loads(raw).get("keyboards") or []) if raw.strip().startswith("{") else [])))(sys.argv[22]),
+    "hostName": sys.argv[23],
+    "kernelVer": sys.argv[24],
+    "distroName": sys.argv[25],
+    "netDown": net_down,
+    "netUp": net_up
 }, ensure_ascii=False))
-' "$wifi_en" "$wifi_ssid" "$eth_con" "$bt_en" "$bt_dev" "$vol" "$muted" "$has_br" "$br" "$has_bat" "$bat_pct" "$bat_chg" "$cpu" "$ram_pct" "$ram_txt" "$disk_pct" "$disk_txt" "$up_txt" "$usr" "$night_light" "$power_prof" "$kbd_layout"
+' "$wifi_en" "$wifi_ssid" "$eth_con" "$bt_en" "$bt_dev" "$vol" "$muted" "$has_br" "$br" "$has_bat" "$bat_pct" "$bat_chg" "$cpu" "$ram_pct" "$ram_txt" "$disk_pct" "$disk_txt" "$up_txt" "$usr" "$night_light" "$power_prof" "$kbd_raw" "$host_name" "$kern_ver" "$distro_name"
     ;;
 
   wifi-list)
@@ -134,22 +171,102 @@ print(json.dumps({
         echo "[]"
         exit 0
     fi
-    nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list 2>/dev/null | python3 -c '
-import sys, json
+    RESCAN_FLAG="no"
+    [ "${2:-}" = "rescan" ] && RESCAN_FLAG="yes"
+    python3 - "${RESCAN_FLAG}" <<'PYEOF'
+import json, re, subprocess, sys
+
+rescan = sys.argv[1]
+saved = set()
+try:
+    out_saved = subprocess.check_output(
+        ["nmcli", "-t", "-f", "TYPE,NAME", "connection", "show"],
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    for line in out_saved.splitlines():
+        if line.startswith("802-11-wireless:"):
+            saved.add(line.split(":", 1)[1].replace("\\:", ":").strip())
+except Exception:
+    pass
+
+try:
+    raw = subprocess.check_output(
+        ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", rescan],
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+except Exception:
+    raw = ""
+
 seen = {}
-for line in sys.stdin:
-    parts = line.rstrip("\n").split(":")
-    if len(parts) < 4: continue
+for line in raw.splitlines():
+    # Split on unescaped colons so SSIDs containing ':' still parse cleanly
+    parts = [p.replace("\\:", ":") for p in re.split(r"(?<!\\):", line)]
+    if len(parts) < 4:
+        continue
     in_use = parts[0].strip() == "*"
     ssid = parts[1].strip()
-    if not ssid: continue
-    sig = int(parts[2] or 0) if parts[2].isdigit() else 0
+    if not ssid:
+        continue
+    sig = int(parts[2]) if parts[2].isdigit() else 0
     sec = parts[3].strip()
+    is_sec = bool(sec and sec != "--")
     if ssid not in seen or in_use or sig > seen[ssid]["signal"]:
-        seen[ssid] = {"ssid": ssid, "signal": sig, "inUse": in_use, "security": sec}
-out = sorted(seen.values(), key=lambda x: (0 if x["inUse"] else 1, -x["signal"]))
-print(json.dumps(out[:14], ensure_ascii=False))
-'
+        seen[ssid] = {
+            "ssid": ssid,
+            "signal": sig,
+            "inUse": in_use,
+            "security": sec if is_sec else "",
+            "saved": ssid in saved,
+        }
+
+out = sorted(seen.values(), key=lambda x: (0 if x["inUse"] else (1 if x["saved"] else 2), -x["signal"]))
+print(json.dumps(out[:16], ensure_ascii=False))
+PYEOF
+    ;;
+
+  wifi-connect)
+    SSID="${2:-}"
+    PASS="${3:-}"
+    if [ -z "${SSID}" ] || ! command -v nmcli >/dev/null 2>&1; then
+        echo '{"ok":false,"error":"Не указана сеть"}'
+        exit 0
+    fi
+    python3 - "${SSID}" "${PASS}" <<'PYEOF'
+import json, subprocess, sys
+
+ssid = sys.argv[1]
+pw = sys.argv[2]
+
+def run(cmd):
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=18)
+    return p.returncode, (p.stderr or p.stdout or "").strip()
+
+if pw:
+    # Delete stale broken profile if any, then connect with password
+    code, err = run(["nmcli", "dev", "wifi", "connect", ssid, "password", pw])
+    if code == 0:
+        print(json.dumps({"ok": True}))
+    else:
+        print(json.dumps({"ok": False, "error": err or "Неверный пароль или ошибка сети"}, ensure_ascii=False))
+    sys.exit(0)
+
+# Try bringing up an already-saved NetworkManager connection profile first
+code, err = run(["nmcli", "connection", "up", "id", ssid])
+if code == 0:
+    print(json.dumps({"ok": True}))
+    sys.exit(0)
+
+# Otherwise try direct open connect (with --rescan no so it's instant)
+code2, err2 = run(["nmcli", "dev", "wifi", "connect", ssid])
+if code2 == 0:
+    print(json.dumps({"ok": True}))
+else:
+    low = (err2 + " " + err).lower()
+    need_pw = any(k in low for k in ("secrets", "password", "802-11-wireless-security", "psk", "required"))
+    print(json.dumps({"ok": False, "needPassword": need_pw, "error": err2 or err or "Не удалось подключиться"}, ensure_ascii=False))
+PYEOF
     ;;
 
   bt-list)
@@ -228,11 +345,33 @@ try:
     desc_en = ((cc.get("weatherDesc") or [{}])[0]).get("value", "")
     temp = cc.get("temp_C", "")
     feels = cc.get("FeelsLikeC", "")
+    hum = cc.get("humidity", "")
+    wind = cc.get("windspeedKmph", "")
+    w_days = d.get("weather") or []
+    astro = ((w_days[0].get("astronomy") or [{}])[0]) if w_days else {}
+    sunrise = astro.get("sunrise", "")
+    sunset = astro.get("sunset", "")
+    forecast = []
+    for idx, wd in enumerate(w_days[:3]):
+        h_list = wd.get("hourly") or []
+        mid = h_list[len(h_list)//2] if h_list else {}
+        wdesc = ((mid.get("lang_ru") or [{}])[0]).get("value", "") or ((mid.get("weatherDesc") or [{}])[0]).get("value", "")
+        forecast.append({
+            "date": "Сегодня" if idx == 0 else ("Завтра" if idx == 1 else wd.get("date", "")[5:]),
+            "min": (wd.get("mintempC", "") + "°") if wd.get("mintempC", "") != "" else "",
+            "max": (wd.get("maxtempC", "") + "°") if wd.get("maxtempC", "") != "" else "",
+            "desc": wdesc
+        })
     print(json.dumps({
         "temp": (temp + "°C") if temp != "" else "",
         "feels": (feels + "°C") if feels != "" else "",
         "desc": desc_ru or desc_en,
-        "city": city
+        "city": city,
+        "humidity": (hum + "%") if hum != "" else "",
+        "wind": (wind + " км/ч") if wind != "" else "",
+        "sunrise": sunrise,
+        "sunset": sunset,
+        "forecast": forecast
     }, ensure_ascii=False))
 except Exception:
     print("{}")

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell.Widgets
 import "../services"
 
 Item {
@@ -40,6 +41,7 @@ Item {
 
             M3Shape {
                 anchors.fill: parent
+                visible: ShellConfig.launcherImagePath === ""
                 shape: ShellConfig.launcherShape
                 morphFactor: 1.0
                 fillColor: SystemState.launcherOpen
@@ -53,9 +55,30 @@ Item {
 
             SysIcon {
                 anchors.centerIn: parent
+                visible: ShellConfig.launcherImagePath === ""
                 name: "apps"
                 size: 15
                 color: SystemState.launcherOpen ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+            }
+
+            ClippingRectangle {
+                anchors.fill: parent
+                anchors.margins: 2
+                visible: ShellConfig.launcherImagePath !== ""
+                radius: 11
+                color: MusicState.m3SurfaceContainer
+                rotation: SystemState.launcherOpen ? 360 : 0
+                scale: SystemState.launcherOpen ? 1.06 : (appBtnMa.containsMouse ? 1.04 : 1.0)
+                Behavior on rotation { M3Anim { duration: 480 } }
+                Behavior on scale    { M3Anim { duration: 240 } }
+
+                Image {
+                    anchors.fill: parent
+                    source: ShellConfig.launcherImagePath !== "" ? ("file://" + ShellConfig.launcherImagePath) : ""
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                    asynchronous: true
+                }
             }
 
             MouseArea {
