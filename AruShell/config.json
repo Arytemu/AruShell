@@ -1,0 +1,32 @@
+{
+  "layer": "bottom",
+  "respect_bar_margin_top": 44,
+  "dock_pinned": false,
+  "dock_apps": [
+    "kitty",
+    "org.gnome.Nautilus",
+    "firefox",
+    "org.telegram.desktop",
+    "steam",
+    "yandex-music"
+  ],
+  "launcher_cmd": "",
+  "default_platform": "yandex",
+  "playback_mode": "in_app",
+  "in_app_playback": true,
+  "yandex_music_token": "",
+  "video_wallpaper": true,
+  "video_engine": "qtmultimedia",
+  "prefer_yandex_videoshots": false,
+  "video_rotation": 0,
+  "custom_video_backend_url": "",
+  "piped_instances": [
+    "https://api.piped.private.coffee",
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.adminforge.de"
+  ],
+  "fallback_video_path": "",
+  "clock_24h": false,
+  "font_clock": "Google Sans",
+  "font_ui": "Google Sans"
+}
