@@ -15,6 +15,10 @@ Singleton {
     property var activeToast: null
     property int unreadCount: 0
 
+    // Keep live C++ Notification* references strictly out of ListView model items,
+    // and clean them up immediately when `closed` fires so Qt never hits a dangling QObject*!
+    property var _liveNotifs: ({})
+
     NotificationServer {
         id: server
         bodySupported: true
@@ -24,23 +28,47 @@ Singleton {
         keepOnReload: true
 
         onNotification: function(n) {
+            if (!n) return
             n.tracked = true
+            const nid = String(n.id)
             const nowStr = Qt.formatTime(new Date(), "HH:mm")
-            const entry = {
-                id: n.id,
-                appName: n.appName || "Система",
-                desktopEntry: n.desktopEntry || "",
-                summary: n.summary || "",
-                body: n.body || "",
-                appIcon: n.appIcon || "",
-                image: n.image || "",
-                time: nowStr,
-                actions: n.actions || [],
-                notif: n
+
+            // Snapshot actions as pure JS objects (no raw C++ NotificationAction* inside model!)
+            const safeActions = []
+            const rawActs = n.actions || []
+            for (let i = 0; i < rawActs.length; i++) {
+                const a = rawActs[i]
+                if (!a) continue
+                safeActions.push({
+                    identifier: String(a.identifier || ""),
+                    text: String(a.text || "")
+                })
             }
 
-            const next = [entry].concat(root.history).slice(0, 25)
-            root.history = next
+            root._liveNotifs[nid] = n
+            try {
+                n.closed.connect(function() {
+                    if (root._liveNotifs && root._liveNotifs[nid]) {
+                        delete root._liveNotifs[nid]
+                    }
+                })
+            } catch (e) {}
+
+            const entry = {
+                id: n.id,
+                appName: String(n.appName || "Система"),
+                desktopEntry: String(n.desktopEntry || ""),
+                summary: String(n.summary || ""),
+                body: String(n.body || ""),
+                appIcon: String(n.appIcon || ""),
+                image: String(n.image || ""),
+                time: nowStr,
+                actions: safeActions
+            }
+
+            // Replace existing entry with same id or prepend
+            const filtered = root.history.filter(function(it) { return it && it.id !== n.id })
+            root.history = [entry].concat(filtered).slice(0, 25)
             if (!root.centerOpen) {
                 root.unreadCount += 1
             }
@@ -96,7 +124,7 @@ Singleton {
             for (let k = 0; k < keys.length; k++) {
                 const key = keys[k]
                 if (!key) continue
-                if (aid.indexOf(key) !== -1 || key.indexOf(aid) !== -1 && aid !== "" || ttl.indexOf(key) !== -1) {
+                if (aid.indexOf(key) !== -1 || (key.indexOf(aid) !== -1 && aid !== "") || ttl.indexOf(key) !== -1) {
                     try {
                         tl.activate()
                         return true
@@ -125,12 +153,17 @@ Singleton {
         }
     }
 
+    function _liveFor(entry) {
+        if (!entry) return null
+        return root._liveNotifs[String(entry.id)] || null
+    }
+
     function activateEntry(entry, idx) {
         if (!entry) return
         let invoked = false
-        const acts = (entry.notif && entry.notif.actions) ? entry.notif.actions : (entry.actions || [])
+        const live = _liveFor(entry)
+        const acts = (live && live.actions) ? live.actions : []
 
-        // 1. Prefer the notification's "default" action (standard Desktop Notifications spec)
         for (let i = 0; i < acts.length; i++) {
             const a = acts[i]
             if (a && a.identifier === "default") {
@@ -142,10 +175,8 @@ Singleton {
             }
         }
 
-        // 2. Also bring the sending app window to focus in Hyprland
         focusAppForEntry(entry)
 
-        // 3. If no default action existed and there's a single action, invoke it
         if (!invoked && acts.length === 1 && acts[0]) {
             try { acts[0].invoke() } catch (e) {}
         }
@@ -156,8 +187,15 @@ Singleton {
     }
 
     function invokeAction(entry, actionObj, idx) {
-        if (actionObj) {
-            try { actionObj.invoke() } catch (e) {}
+        if (entry && actionObj) {
+            const live = _liveFor(entry)
+            const acts = (live && live.actions) ? live.actions : []
+            for (let i = 0; i < acts.length; i++) {
+                if (acts[i] && acts[i].identifier === actionObj.identifier) {
+                    try { acts[i].invoke() } catch (e) {}
+                    break
+                }
+            }
         }
         focusAppForEntry(entry)
         centerOpen = false
@@ -168,8 +206,10 @@ Singleton {
     function dismissAt(idx) {
         if (idx < 0 || idx >= history.length) return
         const item = history[idx]
-        if (item && item.notif) {
-            try { item.notif.dismiss() } catch (e) {}
+        const live = _liveFor(item)
+        if (live) {
+            try { live.dismiss() } catch (e) {}
+            delete root._liveNotifs[String(item.id)]
         }
         const copy = history.slice()
         copy.splice(idx, 1)
@@ -178,10 +218,12 @@ Singleton {
 
     function clearAll() {
         for (let i = 0; i < history.length; i++) {
-            if (history[i] && history[i].notif) {
-                try { history[i].notif.dismiss() } catch (e) {}
+            const live = _liveFor(history[i])
+            if (live) {
+                try { live.dismiss() } catch (e) {}
             }
         }
+        _liveNotifs = ({})
         history = []
         unreadCount = 0
     }

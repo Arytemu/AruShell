@@ -7,20 +7,21 @@ import "../services"
 
 /**
  * Material You (M3 Expressive) Album Card:
- * - Tonal surface container dynamically tinted by album art
- * - Soft M3 elevation shadow, zero harsh white borders
+ * - Tonal surface container dynamically tinted by album art / wallpaper
+ * - Genre-adaptive typography (Rap / Rock / Electronic / Soul / Pop)
+ * - Built-in Prev / Play-Pause / Next controls right on the desktop card
  * - Tonal M3 "Other lyrics" pill button underneath
  */
 Column {
     id: root
-    spacing: 14
-    width: 282
+    spacing: 12
+    width: 286
 
     Item {
         id: cardContainer
         width: parent.width
-        height: 344
-        scale: cardHover.containsMouse ? 1.02 : 1.0
+        height: 392
+        scale: cardHover.containsMouse ? 1.015 : 1.0
         Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
         // Soft M3 Elevation Shadow
@@ -49,12 +50,18 @@ Column {
             radius: 28
             color: MusicState.m3SurfaceContainer
 
+            MouseArea {
+                id: cardHover
+                anchors.fill: parent
+                hoverEnabled: true
+            }
+
             Column {
                 anchors.fill: parent
                 anchors.margins: 14
-                spacing: 12
+                spacing: 11
 
-                // Rounded Album Art
+                // Rounded Album Art (click toggles play/pause)
                 Item {
                     width: parent.width
                     height: parent.width
@@ -104,20 +111,69 @@ Column {
                         smooth: true
                         opacity: 0.9
                     }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: MusicState.togglePlay()
+                    }
+
+                    // Minimize-to-Dynamic-Island Button (top-right corner of cover)
+                    Rectangle {
+                        id: minIslandBtn
+                        anchors {
+                            top: parent.top
+                            right: parent.right
+                            topMargin: 10
+                            rightMargin: 10
+                        }
+                        width: 30
+                        height: 30
+                        radius: 15
+                        z: 6
+                        color: minIslandMa.containsMouse
+                            ? MusicState.m3PrimaryContainer
+                            : Qt.rgba(MusicState.m3SurfaceContainer.r, MusicState.m3SurfaceContainer.g, MusicState.m3SurfaceContainer.b, 0.80)
+                        border.width: 1
+                        border.color: minIslandMa.containsMouse ? MusicState.m3Primary : MusicState.m3OutlineVariant
+                        scale: minIslandMa.pressed ? 0.90 : (minIslandMa.containsMouse ? 1.06 : 1.0)
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on scale { M3Anim { duration: 180 } }
+
+                        SysIcon {
+                            anchors.centerIn: parent
+                            name: "chevron_left"
+                            size: 14
+                            rotation: 90
+                            color: minIslandMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                        }
+
+                        MouseArea {
+                            id: minIslandMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: MusicState.stageMinimizedToIsland = true
+                        }
+                    }
                 }
 
-                // Track Title & Artist (or Material 3 Status Pill)
+                // Track Title & Artist (Genre-adaptive typography with smooth morph!)
                 Column {
                     width: parent.width
-                    spacing: 3
+                    spacing: 2
+                    opacity: MusicState.moodFontOpacity
+                    scale: MusicState.moodFontScale
 
                     Text {
                         width: parent.width
                         horizontalAlignment: Text.AlignHCenter
                         text: MusicState.hasTrack ? MusicState.trackTitle : "Not Playing"
                         color: MusicState.m3OnSurface
-                        font.family: MusicState.fontUi
-                        font.pixelSize: 15
+                        font.family: MusicState.trackMoodFont
+                        font.italic: MusicState.trackMoodItalic
+                        font.letterSpacing: MusicState.trackMoodSpacing
+                        font.pixelSize: MusicState.trackGenre === "rap" ? 20 : 15
                         font.weight: Font.Bold
                         elide: Text.ElideRight
                     }
@@ -130,8 +186,9 @@ Column {
                             ? (MusicState.trackArtist + (MusicState.trackAlbum ? " · " + MusicState.trackAlbum : ""))
                             : ("Ready on " + MusicState.currentPlatformObj.name)
                         color: MusicState.m3OnSurfaceVariant
-                        font.family: MusicState.fontUi
-                        font.pixelSize: 12
+                        font.family: MusicState.trackMoodFont
+                        font.italic: MusicState.trackMoodItalic
+                        font.pixelSize: MusicState.trackGenre === "rap" ? 14 : 12
                         elide: Text.ElideRight
                     }
 
@@ -170,14 +227,87 @@ Column {
                         }
                     }
                 }
-            }
 
-            MouseArea {
-                id: cardHover
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: MusicState.togglePlay()
+                // Expressive Prev / Play-Pause / Next Controls Row
+                RowLayout {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 14
+
+                    Rectangle {
+                        Layout.preferredWidth: 36
+                        Layout.preferredHeight: 36
+                        radius: prevBtnMa.containsMouse ? 12 : 18
+                        color: prevBtnMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                        Behavior on radius { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                        Behavior on color  { ColorAnimation  { duration: 140 } }
+
+                        SysIcon {
+                            anchors.centerIn: parent
+                            name: "skip_prev"
+                            size: 17
+                            color: prevBtnMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                        }
+
+                        MouseArea {
+                            id: prevBtnMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: MusicState.prevTrack()
+                        }
+                    }
+
+                    Item {
+                        Layout.preferredWidth: 44
+                        Layout.preferredHeight: 44
+
+                        M3Shape {
+                            anchors.fill: parent
+                            shape: "cookie12"
+                            fillColor: MusicState.m3Primary
+                            morphFactor: MusicState.isPlaying ? 1.0 : 0.0
+                            spin: MusicState.isPlaying
+                            spinDuration: 14000
+                        }
+
+                        SysIcon {
+                            anchors.centerIn: parent
+                            name: MusicState.isPlaying ? "pause" : "play"
+                            size: 19
+                            color: MusicState.m3OnPrimary
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: MusicState.togglePlay()
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 36
+                        Layout.preferredHeight: 36
+                        radius: nextBtnMa.containsMouse ? 12 : 18
+                        color: nextBtnMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                        Behavior on radius { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                        Behavior on color  { ColorAnimation  { duration: 140 } }
+
+                        SysIcon {
+                            anchors.centerIn: parent
+                            name: "skip_next"
+                            size: 17
+                            color: nextBtnMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                        }
+
+                        MouseArea {
+                            id: nextBtnMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: MusicState.nextTrack()
+                        }
+                    }
+                }
             }
         }
     }

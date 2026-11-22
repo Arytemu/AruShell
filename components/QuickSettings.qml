@@ -31,8 +31,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 26
+        radius: MusicState.shapeXl
         color: MusicState.m3SurfaceContainer
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         // Absorb background clicks
         MouseArea { anchors.fill: parent }
@@ -59,23 +61,25 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: "Быстрые настройки"
-                    color: MusicState.m3OnSurfaceVariant
-                    font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold
+                    color: MusicState.m3OnSurface
+                    font.family: MusicState.fontUi; font.pixelSize: MusicState.typeTitleSm; font.weight: Font.Bold
                 }
 
                 Rectangle {
-                    Layout.preferredHeight: 26
-                    Layout.preferredWidth: editPillRow.implicitWidth + 16
-                    radius: 13
-                    color: editPillMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                    Layout.preferredHeight: 28
+                    Layout.preferredWidth: editPillRow.implicitWidth + 18
+                    radius: 14
+                    color: editPillMa.containsMouse ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainerHigh
+                    border.width: 1
+                    border.color: MusicState.m3OutlineVariant
                     Behavior on color { ColorAnimation { duration: 150 } }
 
                     RowLayout {
                         id: editPillRow
                         anchors.centerIn: parent
                         spacing: 5
-                        SysIcon { name: "sliders"; size: 12; color: editPillMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface }
-                        Text { text: "Изменить"; color: editPillMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 10; font.weight: Font.Bold }
+                        SysIcon { name: "edit"; size: 12; color: editPillMa.containsMouse ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface }
+                        Text { text: "Изменить"; color: editPillMa.containsMouse ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: MusicState.typeLabelMd; font.weight: Font.SemiBold }
                     }
 
                     MouseArea {
@@ -102,7 +106,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.columnSpan: ShellConfig.isQsWide("wifi") ? 2 : 1
                     Layout.preferredHeight: ShellConfig.qsTileHeight
-                    radius: (SystemState.wifiEnabled || SystemState.ethernetConnected) ? 15 : 29
+                    radius: (SystemState.wifiEnabled || SystemState.ethernetConnected) ? MusicState.shapeLg : Math.round(ShellConfig.qsTileHeight / 2)
                     Behavior on radius { M3Anim { duration: 280 } }
                     color: (SystemState.wifiEnabled || SystemState.ethernetConnected)
                         ? MusicState.m3PrimaryContainer
@@ -255,9 +259,9 @@ Item {
                     Layout.fillWidth: true
                     Layout.columnSpan: ShellConfig.isQsWide("nightLight") ? 2 : 1
                     Layout.preferredHeight: ShellConfig.qsTileHeight
-                    radius: SystemState.nightLight ? 14 : 25
+                    radius: SystemState.nightLight ? MusicState.shapeLg : Math.round(ShellConfig.qsTileHeight / 2)
                     Behavior on radius { M3Anim { duration: 280 } }
-                    color: SystemState.nightLight ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                    color: SystemState.nightLight ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainerHigh
                     Behavior on color { ColorAnimation { duration: 200 } }
 
                     RowLayout {
@@ -269,7 +273,7 @@ Item {
                         SysIcon {
                             name: "nightlight"
                             size: 17
-                            color: SystemState.nightLight ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                            color: SystemState.nightLight ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface
                             Layout.alignment: Qt.AlignVCenter
                         }
 
@@ -279,14 +283,14 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: "Ночной свет"
-                                color: SystemState.nightLight ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                                color: SystemState.nightLight ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface
                                 font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold
                                 elide: Text.ElideRight
                             }
                             Text {
                                 Layout.fillWidth: true
                                 text: SystemState.nightLight ? "4200K · Вкл" : "Выкл"
-                                color: SystemState.nightLight ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurfaceVariant
+                                color: SystemState.nightLight ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurfaceVariant
                                 opacity: 0.85
                                 font.family: MusicState.fontUi; font.pixelSize: 10
                             }
@@ -307,11 +311,11 @@ Item {
                     Layout.fillWidth: true
                     Layout.columnSpan: ShellConfig.isQsWide("powerProfile") ? 2 : 1
                     Layout.preferredHeight: ShellConfig.qsTileHeight
-                    radius: isActive ? 14 : 25
+                    radius: isActive ? MusicState.shapeLg : Math.round(ShellConfig.qsTileHeight / 2)
                     Behavior on radius { M3Anim { duration: 280 } }
                     readonly property bool hasProf: SystemState.powerProfile !== ""
                     readonly property bool isActive: hasProf ? (SystemState.powerProfile === "performance") : NotifState.dndEnabled
-                    color: isActive ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                    color: isActive ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainerHigh
                     Behavior on color { ColorAnimation { duration: 200 } }
 
                     RowLayout {
@@ -323,7 +327,7 @@ Item {
                         SysIcon {
                             name: profTile.hasProf ? "performance" : (NotifState.dndEnabled ? "bell_off" : "bell")
                             size: 17
-                            color: profTile.isActive ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                            color: profTile.isActive ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface
                             Layout.alignment: Qt.AlignVCenter
                         }
 
@@ -333,7 +337,7 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: profTile.hasProf ? "Питание" : "Не беспокоить"
-                                color: profTile.isActive ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                                color: profTile.isActive ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface
                                 font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold
                                 elide: Text.ElideRight
                             }
@@ -342,7 +346,7 @@ Item {
                                 text: profTile.hasProf
                                     ? (SystemState.powerProfile === "performance" ? "Максимум" : (SystemState.powerProfile === "power-saver" ? "Экономия" : "Баланс"))
                                     : (NotifState.dndEnabled ? "Вкл" : "Выкл")
-                                color: profTile.isActive ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurfaceVariant
+                                color: profTile.isActive ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurfaceVariant
                                 opacity: 0.85
                                 font.family: MusicState.fontUi; font.pixelSize: 10
                             }
@@ -463,18 +467,18 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    radius: SystemState.gameMode ? 12 : 18
-                    color: SystemState.gameMode ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
-                    Behavior on radius { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    radius: SystemState.gameMode ? MusicState.shapeMd : 18
+                    color: SystemState.gameMode ? MusicState.m3TertiaryContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on radius { M3Anim { duration: 220 } }
                     Behavior on color  { ColorAnimation  { duration: 160 } }
 
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        SysIcon { name: "apps"; size: 14; color: SystemState.gameMode ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface }
+                        SysIcon { name: "apps"; size: 14; color: SystemState.gameMode ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurface }
                         Text {
                             text: SystemState.gameMode ? "Игровой: Вкл" : "Игровой режим"
-                            color: SystemState.gameMode ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                            color: SystemState.gameMode ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurface
                             font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold
                         }
                     }
@@ -484,18 +488,18 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 36
-                    radius: SystemState.keepAwake ? 12 : 18
-                    color: SystemState.keepAwake ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
-                    Behavior on radius { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    radius: SystemState.keepAwake ? MusicState.shapeMd : 18
+                    color: SystemState.keepAwake ? MusicState.m3TertiaryContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on radius { M3Anim { duration: 220 } }
                     Behavior on color  { ColorAnimation  { duration: 160 } }
 
                     RowLayout {
                         anchors.centerIn: parent
                         spacing: 6
-                        SysIcon { name: "brightness"; size: 14; color: SystemState.keepAwake ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface }
+                        SysIcon { name: "brightness"; size: 14; color: SystemState.keepAwake ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurface }
                         Text {
                             text: SystemState.keepAwake ? "Экран: Не спать" : "Не засыпать"
-                            color: SystemState.keepAwake ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                            color: SystemState.keepAwake ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurface
                             font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold
                         }
                     }
@@ -548,26 +552,30 @@ Item {
 
                 Rectangle {
                     Layout.preferredWidth: 34; Layout.preferredHeight: 34; radius: 17
-                    color: lockMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
-                    SysIcon { anchors.centerIn: parent; name: "lock"; size: 15; color: MusicState.m3OnSurface }
+                    color: lockMa.containsMouse ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    SysIcon { anchors.centerIn: parent; name: "lock"; size: 15; color: lockMa.containsMouse ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface }
                     MouseArea { id: lockMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: SystemState.lockScreen() }
                 }
                 Rectangle {
                     Layout.preferredWidth: 34; Layout.preferredHeight: 34; radius: 17
-                    color: suspMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
-                    SysIcon { anchors.centerIn: parent; name: "moon"; size: 15; color: MusicState.m3OnSurface }
+                    color: suspMa.containsMouse ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    SysIcon { anchors.centerIn: parent; name: "moon"; size: 15; color: suspMa.containsMouse ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface }
                     MouseArea { id: suspMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: SystemState.suspendSystem() }
                 }
                 Rectangle {
                     Layout.preferredWidth: 34; Layout.preferredHeight: 34; radius: 17
-                    color: rebMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
-                    SysIcon { anchors.centerIn: parent; name: "reboot"; size: 15; color: MusicState.m3OnSurface }
+                    color: rebMa.containsMouse ? MusicState.m3ErrorContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    SysIcon { anchors.centerIn: parent; name: "reboot"; size: 15; color: rebMa.containsMouse ? MusicState.m3OnErrorContainer : MusicState.m3OnSurface }
                     MouseArea { id: rebMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: SystemState.rebootSystem() }
                 }
                 Rectangle {
                     Layout.preferredWidth: 34; Layout.preferredHeight: 34; radius: 17
-                    color: pwrMa.containsMouse ? "#B3261E" : MusicState.m3SurfaceContainerHigh
-                    SysIcon { anchors.centerIn: parent; name: "power"; size: 15; color: MusicState.m3OnSurface }
+                    color: pwrMa.containsMouse ? MusicState.m3ErrorContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    SysIcon { anchors.centerIn: parent; name: "power"; size: 15; color: pwrMa.containsMouse ? MusicState.m3OnErrorContainer : MusicState.m3Error }
                     MouseArea { id: pwrMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: SystemState.powerOffSystem() }
                 }
             }

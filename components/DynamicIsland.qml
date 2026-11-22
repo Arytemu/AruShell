@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Widgets
 import "../services"
 
@@ -17,6 +18,13 @@ Item {
 
     readonly property bool isToast: NotifState.activeToast !== null && !NotifState.islandExpanded
     readonly property bool isExpanded: NotifState.islandExpanded
+
+    readonly property bool activeWsHasWindows: {
+        const ws = Hyprland.focusedWorkspace
+        return !!(ws && ws.toplevels && ws.toplevels.values && ws.toplevels.values.length > 0)
+    }
+    // Hide mini-song on empty desktop when AlbumCard is visible; show when windows are open OR when minimized to Island
+    readonly property bool showTrackInCompactIsland: MusicState.hasTrack && (activeWsHasWindows || MusicState.stageMinimizedToIsland || !ShellConfig.stageVisible)
 
     property int currentTab: 1 // 0: Dashboard, 1: Media, 2: Performance
     property int calMonthOffset: 0
@@ -96,13 +104,34 @@ Item {
         height: root.targetHeight
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
-        radius: root.isExpanded ? 26 : (root.isToast ? 22 : 18)
+        radius: root.isExpanded ? MusicState.shapeXl : (root.isToast ? 22 : 18)
         color: MusicState.m3SurfaceContainer
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
         clip: true
 
-        Behavior on width  { M3Anim { duration: 400 } }
+        Behavior on width  { M3Anim { duration: 440 } }
         Behavior on height { M3Anim { duration: 380 } }
         Behavior on radius { M3Anim { duration: 340 } }
+
+        // Subtle Telegram-style liquid absorption pulse when AlbumCard merges into / emerges from Island
+        property real absorbScale: 1.0
+        scale: absorbScale
+        transformOrigin: Item.Top
+
+        SequentialAnimation {
+            id: absorbPulse
+            PauseAnimation { duration: 240 }
+            NumberAnimation { target: islandBody; property: "absorbScale"; to: 1.07; duration: 170; easing.type: Easing.OutCubic }
+            NumberAnimation { target: islandBody; property: "absorbScale"; to: 1.0;  duration: 280; easing.type: Easing.OutBack }
+        }
+
+        Connections {
+            target: MusicState
+            function onStageMinimizedToIslandChanged() {
+                absorbPulse.restart()
+            }
+        }
 
         // Auto-close Dynamic Island gracefully when cursor leaves it
         HoverHandler {
@@ -145,18 +174,30 @@ Item {
             Behavior on opacity { M3Anim { duration: 220 } }
 
             ClippingRectangle {
-                visible: MusicState.hasTrack && MusicState.artUrl !== ""
+                visible: root.showTrackInCompactIsland && MusicState.artUrl !== ""
                 Layout.preferredWidth: 22
                 Layout.preferredHeight: 22
                 Layout.alignment: Qt.AlignVCenter
                 radius: 11
                 color: MusicState.m3SurfaceContainerHigh
+                scale: visible ? 1.0 : 0.2
+                opacity: visible ? 1.0 : 0.0
+                Behavior on scale   { NumberAnimation { duration: 380; easing.type: Easing.OutBack } }
+                Behavior on opacity { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
 
                 Image {
                     anchors.fill: parent
                     source: MusicState.artUrl
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
+                }
+
+                // Clicking the mini cover when minimized restores the AlbumCard back to the desktop!
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: MusicState.stageMinimizedToIsland
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: MusicState.stageMinimizedToIsland = false
                 }
             }
 
@@ -190,7 +231,7 @@ Item {
 
             // GPU-accelerated Equalizer Bars
             Row {
-                visible: MusicState.isPlaying
+                visible: root.showTrackInCompactIsland && MusicState.isPlaying
                 Layout.alignment: Qt.AlignVCenter
                 spacing: 2.5
 
@@ -299,7 +340,9 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: 18
-                    color: MusicState.m3SurfaceContainerHigh
+                    color: MusicState.m3SurfaceContainerLow
+                    border.width: 1
+                    border.color: MusicState.m3OutlineVariant
                 }
 
                 Rectangle {
@@ -311,7 +354,7 @@ Item {
                     y: 3
                     x: 3 + animTab * width
                     radius: 15
-                    color: MusicState.m3PrimaryContainer
+                    color: MusicState.m3SecondaryContainer
                 }
 
                 Row {
@@ -647,7 +690,10 @@ Item {
                                     Layout.fillWidth: true
                                     text: MusicState.hasTrack ? MusicState.trackTitle : "Ничего не играет"
                                     color: MusicState.m3OnSurface
-                                    font.family: MusicState.fontUi
+                                    opacity: MusicState.moodFontOpacity
+                                    font.family: MusicState.trackMoodFont
+                                    font.italic: MusicState.trackMoodItalic
+                                    font.letterSpacing: MusicState.trackMoodSpacing
                                     font.pixelSize: 16
                                     font.weight: Font.Bold
                                     elide: Text.ElideRight
@@ -692,11 +738,7 @@ Item {
                                 Rectangle {
                                     Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 19
                                     color: pMa.containsMouse ? MusicState.m3SurfaceContainerHighest : MusicState.m3SurfaceContainer
-                                    IconImage {
-                                        id: pIc; anchors.centerIn: parent; implicitSize: 16; visible: false
-                                        source: root.sysIcon(["media-skip-backward-symbolic", "go-previous-symbolic"])
-                                    }
-                                    MultiEffect { anchors.fill: pIc; source: pIc; colorization: 1.0; colorizationColor: MusicState.m3OnSurface }
+                                    SysIcon { anchors.centerIn: parent; name: "skip_prev"; size: 17; color: MusicState.m3OnSurface }
                                     MouseArea { id: pMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: MusicState.prevTrack() }
                                 }
 
@@ -711,25 +753,38 @@ Item {
                                         spin: MusicState.isPlaying && root.isExpanded && root.currentTab === 1
                                         spinDuration: 14000
                                     }
-                                    IconImage {
-                                        id: plIc; anchors.centerIn: parent; implicitSize: 18; visible: false
-                                        source: MusicState.isPlaying
-                                            ? root.sysIcon(["media-playback-pause-symbolic"])
-                                            : root.sysIcon(["media-playback-start-symbolic"])
-                                    }
-                                    MultiEffect { anchors.fill: plIc; source: plIc; colorization: 1.0; colorizationColor: MusicState.m3OnPrimary }
+                                    SysIcon { anchors.centerIn: parent; name: MusicState.isPlaying ? "pause" : "play"; size: 20; color: MusicState.m3OnPrimary }
                                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: MusicState.togglePlay() }
                                 }
 
                                 Rectangle {
                                     Layout.preferredWidth: 38; Layout.preferredHeight: 38; radius: 19
                                     color: nMa.containsMouse ? MusicState.m3SurfaceContainerHighest : MusicState.m3SurfaceContainer
-                                    IconImage {
-                                        id: nIc; anchors.centerIn: parent; implicitSize: 16; visible: false
-                                        source: root.sysIcon(["media-skip-forward-symbolic", "go-next-symbolic"])
-                                    }
-                                    MultiEffect { anchors.fill: nIc; source: nIc; colorization: 1.0; colorizationColor: MusicState.m3OnSurface }
+                                    SysIcon { anchors.centerIn: parent; name: "skip_next"; size: 17; color: MusicState.m3OnSurface }
                                     MouseArea { id: nMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: MusicState.nextTrack() }
+                                }
+
+                                // Restore-to-Desktop / Minimize-to-Island toggle button
+                                Rectangle {
+                                    visible: MusicState.hasTrack
+                                    Layout.preferredWidth: 34; Layout.preferredHeight: 34; radius: 17
+                                    color: rstMa.containsMouse ? MusicState.m3SecondaryContainer : MusicState.m3SurfaceContainer
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                    SysIcon {
+                                        anchors.centerIn: parent
+                                        name: "chevron_left"
+                                        size: 14
+                                        rotation: MusicState.stageMinimizedToIsland ? -90 : 90
+                                        color: rstMa.containsMouse ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurfaceVariant
+                                        Behavior on rotation { M3Anim { duration: 240 } }
+                                    }
+                                    MouseArea {
+                                        id: rstMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: MusicState.stageMinimizedToIsland = !MusicState.stageMinimizedToIsland
+                                    }
                                 }
 
                                 Item { Layout.fillWidth: true }
@@ -783,7 +838,8 @@ Item {
                                             text: modelData.text || ""
                                             color: isCur ? MusicState.m3Primary : MusicState.m3OnSurfaceVariant
                                             opacity: isCur ? 1.0 : 0.62
-                                            font.family: MusicState.fontUi
+                                            font.family: MusicState.trackMoodFont
+                                            font.italic: MusicState.trackMoodItalic
                                             font.pixelSize: isCur ? 12 : 11
                                             font.weight: isCur ? Font.Bold : Font.Normal
                                             wrapMode: Text.Wrap

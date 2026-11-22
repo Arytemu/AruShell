@@ -8,35 +8,38 @@ Item {
     anchors.fill: parent
 
     property var parentPanel: null
+    readonly property int islandHitWidth: island.width
+    readonly property int islandHitHeight: island.height
 
     MouseArea {
         anchors.fill: parent
-        enabled: NotifState.centerOpen || NotifState.islandExpanded || SystemState.quickSettingsOpen || SystemState.launcherOpen || ClipboardState.open
+        enabled: NotifState.centerOpen || NotifState.islandExpanded || SystemState.quickSettingsOpen || SystemState.langMenuOpen || SystemState.launcherOpen || ClipboardState.open
         onClicked: {
             NotifState.closeAllPopups()
             SystemState.quickSettingsOpen = false
+            SystemState.langMenuOpen = false
             SystemState.launcherOpen = false
             ClipboardState.open = false
         }
     }
 
-    // Left slot: App Launcher Pill (left of Pac-Man) + Pac-Man Workspace Switcher
+    // Left slot: App Launcher (36x36, matches all topbar pills!) + Pac-Man Workspace Switcher
     RowLayout {
         id: leftSlot
         anchors {
             left: parent.left
             top: parent.top
-            leftMargin: 10
+            leftMargin: 12
             topMargin: 6
         }
         height: 36
         spacing: 8
         z: 10
 
-        // Material 3 Expressive 4-Leaf Clover App Launcher Button
+        // Material 3 Expressive App Launcher Button (unified 36x36 height + outlineVariant border)
         Item {
-            Layout.preferredWidth: 40
-            Layout.preferredHeight: 40
+            Layout.preferredWidth: 36
+            Layout.preferredHeight: 36
             Layout.alignment: Qt.AlignVCenter
 
             M3Shape {
@@ -47,8 +50,10 @@ Item {
                 fillColor: SystemState.launcherOpen
                     ? MusicState.m3PrimaryContainer
                     : (appBtnMa.containsMouse ? MusicState.m3SurfaceContainerHigh : MusicState.m3SurfaceContainer)
+                strokeWidth: 1.1
+                strokeColor: SystemState.launcherOpen ? MusicState.m3Primary : MusicState.m3OutlineVariant
                 rotation: SystemState.launcherOpen ? 360 : 0
-                scale: SystemState.launcherOpen ? 1.06 : (appBtnMa.containsMouse ? 1.04 : 1.0)
+                scale: SystemState.launcherOpen ? 1.05 : (appBtnMa.containsMouse ? 1.03 : 1.0)
                 Behavior on rotation { M3Anim { duration: 480 } }
                 Behavior on scale    { M3Anim { duration: 240 } }
             }
@@ -149,6 +154,23 @@ Item {
 
         ClipboardOverlay {
             anchors.horizontalCenter: parent.horizontalCenter
+        }
+    }
+
+    // Language / Keyboard Layout Dropdown (anchored below merged right pill)
+    Item {
+        anchors {
+            right: parent.right
+            top: parent.top
+            rightMargin: 92
+            topMargin: 52
+        }
+        width: 220
+        height: 240
+        z: 21
+
+        LanguageMenu {
+            anchors.right: parent.right
         }
     }
 

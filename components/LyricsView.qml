@@ -25,6 +25,8 @@ Item {
     ListView {
         id: lyricsList
         anchors.fill: parent
+        opacity: MusicState.moodFontOpacity
+        scale: MusicState.moodFontScale
         clip: true
         spacing: 16
         model: MusicState.lyricsLines
@@ -57,8 +59,10 @@ Item {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     text: modelData.text || ""
-                    font.family: MusicState.fontUi
-                    font.pixelSize: isActive ? 28 : (dist === 1 ? 19 : 16)
+                    font.family: MusicState.trackMoodFont
+                    font.italic: MusicState.trackMoodItalic
+                    font.letterSpacing: MusicState.trackMoodSpacing
+                    font.pixelSize: MusicState.trackGenre === "rap" ? (isActive ? 34 : (dist === 1 ? 23 : 19)) : (isActive ? 28 : (dist === 1 ? 19 : 16))
                     font.weight: isActive ? Font.Black : Font.DemiBold
                     color: isActive
                         ? MusicState.m3Primary

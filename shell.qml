@@ -34,6 +34,12 @@ ShellRoot {
         source: "components/WallpaperCarousel.qml"
     }
 
+    Loader {
+        id: globeLoader
+        active: GlobeSearchState.open
+        source: "components/GlobeSearchOverlay.qml"
+    }
+
     // Caelestia-style Native Wayland Lock Screen (SUPER + L & 10-min hypridle)
     LockScreen {}
 
@@ -72,6 +78,11 @@ ShellRoot {
     IpcHandler {
         target: "lock"
         function lock(): void { LockState.lock() }
+    }
+
+    IpcHandler {
+        target: "globe"
+        function toggle(): void { GlobeSearchState.toggle() }
     }
 
     // =========================================================================
@@ -173,14 +184,40 @@ ShellRoot {
             // Draggable Desktop Music Stage (auto-hides cleanly when music is NOT playing!)
             Item {
                 id: musicStage
-                opacity: (ShellConfig.stageVisible && (MusicState.hasTrack || ShellConfig.editMode)) ? 1.0 : 0.0
+                readonly property bool _minimized: MusicState.stageMinimizedToIsland && !ShellConfig.editMode
+                readonly property bool _hasStage: ShellConfig.stageVisible && (MusicState.hasTrack || ShellConfig.editMode)
+                readonly property real _restY: Math.round((parent.height - height) / 2 + 38 + ShellConfig.stageOffsetY)
+
+                // Telegram-style liquid suction progress (0.0 = desktop center, 1.0 = absorbed inside Dynamic Island)
+                property real suction: _minimized ? 1.0 : 0.0
+                Behavior on suction {
+                    NumberAnimation {
+                        duration: 580
+                        easing.type: Easing.InOutQuart
+                    }
+                }
+
+                // Droplet stretch factor peaks mid-flight (sin(pi * suction))
+                readonly property real _stretch: Math.sin(Math.PI * suction)
+                readonly property real _xScale: Math.max(0.05, 1.0 - suction * 0.94 - _stretch * 0.14)
+                readonly property real _yScale: Math.max(0.05, 1.0 - suction * 0.92 + _stretch * 0.18)
+
+                opacity: !_hasStage ? 0.0 : (suction < 0.68 ? 1.0 : Math.max(0.0, 1.0 - (suction - 0.68) / 0.30))
                 visible: opacity > 0.01
-                Behavior on opacity { M3Anim { duration: 360 } }
+                Behavior on opacity { enabled: !_minimized; M3Anim { duration: 320 } }
+
                 width: parent.width
                 height: 400
                 x: Math.round(ShellConfig.stageOffsetX)
-                y: Math.round((parent.height - height) / 2 + 38 + ShellConfig.stageOffsetY)
+                y: Math.round(_restY * (1.0 - suction) + 10 * suction)
                 z: 5
+
+                transform: Scale {
+                    origin.x: musicStage.width / 2
+                    origin.y: 0
+                    xScale: musicStage._xScale
+                    yScale: musicStage._yScale
+                }
 
                 readonly property bool hasLyrics: MusicState.lyricsLines && MusicState.lyricsLines.length > 0
                 readonly property real gap: 48
@@ -308,7 +345,7 @@ ShellRoot {
             required property var modelData
             screen: modelData
 
-            readonly property bool anyTopPopupOpen: NotifState.centerOpen || SystemState.quickSettingsOpen || SystemState.launcherOpen || ClipboardState.open || NotifState.islandExpanded || NotifState.activeToast !== null
+            readonly property bool anyTopPopupOpen: NotifState.centerOpen || SystemState.quickSettingsOpen || SystemState.langMenuOpen || SystemState.launcherOpen || ClipboardState.open
 
             anchors {
                 top: true
@@ -326,9 +363,14 @@ ShellRoot {
             WlrLayershell.keyboardFocus: (SystemState.launcherOpen || ClipboardState.open || SystemState.wifiPasswordTarget !== "") ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             color: "transparent"
 
-            // Input mask: only captures clicks in top 48px strip when closed, full popup area when open!
+            // Input mask: only captures clicks in top 48px strip + exact Dynamic Island / Toast rect (never blocks sides!)
             mask: Region {
                 item: topInputZone
+                regions: [
+                    Region {
+                        item: islandMaskZone
+                    }
+                ]
             }
 
             Item {
@@ -341,7 +383,19 @@ ShellRoot {
                 height: topBarWin.anyTopPopupOpen ? parent.height : 48
             }
 
+            Item {
+                id: islandMaskZone
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    top: parent.top
+                    topMargin: 6
+                }
+                width: (NotifState.islandExpanded || NotifState.activeToast !== null) ? topBarItem.islandHitWidth : 0
+                height: (NotifState.islandExpanded || NotifState.activeToast !== null) ? topBarItem.islandHitHeight : 0
+            }
+
             TopBar {
+                id: topBarItem
                 parentPanel: topBarWin
             }
         }

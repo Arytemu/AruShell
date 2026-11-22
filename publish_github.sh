@@ -4,7 +4,7 @@ set -euo pipefail
 # Universal GitHub publisher & release formatter for Arytemu/AruShell
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_SLUG="Arytemu/AruShell"
-RELEASE_TAG="${1:-v1.0.0}"
+RELEASE_TAG="${1:-v1.1.0}"
 TMP_REPO="/tmp/AruShell-gh-publish"
 
 echo "==> Публикация и оформление ${REPO_SLUG} (${RELEASE_TAG})..."

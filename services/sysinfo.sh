@@ -381,4 +381,45 @@ except Exception:
   switch-layout)
     command -v hyprctl >/dev/null 2>&1 && hyprctl switchxkblayout all next >/dev/null 2>&1 || true
     ;;
+
+  set-layout)
+    IDX="${2:-next}"
+    command -v hyprctl >/dev/null 2>&1 && hyprctl switchxkblayout all "$IDX" >/dev/null 2>&1 || true
+    ;;
+
+  list-layouts)
+    python3 -c '
+import json, subprocess
+names_map = {
+    "us": ("EN", "English (US)"),
+    "gb": ("EN", "English (UK)"),
+    "ru": ("RU", "Русский"),
+    "ua": ("UK", "Українська"),
+    "de": ("DE", "Deutsch"),
+    "fr": ("FR", "Français"),
+    "es": ("ES", "Español"),
+    "it": ("IT", "Italiano"),
+    "pl": ("PL", "Polski"),
+    "jp": ("JP", "日本語"),
+}
+layouts = []
+try:
+    out = subprocess.check_output(["hyprctl", "devices", "-j"], text=True, stderr=subprocess.DEVNULL)
+    data = json.loads(out)
+    kbs = data.get("keyboards", [])
+    main_kb = next((k for k in kbs if k.get("main")), kbs[0] if kbs else None)
+    if main_kb:
+        raw = str(main_kb.get("layout", "") or "")
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+        for idx, code_raw in enumerate(parts):
+            base = code_raw.split("(")[0].lower()
+            short, full = names_map.get(base, (base[:2].upper(), code_raw.upper()))
+            layouts.append({"index": idx, "code": short, "name": full})
+except Exception:
+    pass
+if not layouts:
+    layouts = [{"index": 0, "code": "EN", "name": "English (US)"}, {"index": 1, "code": "RU", "name": "Русский"}]
+print(json.dumps(layouts, ensure_ascii=False))
+'
+    ;;
 esac

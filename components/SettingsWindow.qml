@@ -72,7 +72,7 @@ PanelWindow {
             anchors.centerIn: parent
             width: 780
             height: 560
-            radius: 30
+            radius: MusicState.shapeXl
             color: MusicState.m3SurfaceContainer
             border.width: 1
             border.color: MusicState.m3OutlineVariant
@@ -84,24 +84,32 @@ PanelWindow {
                 anchors.fill: parent
                 spacing: 0
 
-                // Left Navigation Sidebar (Caelestia Control Center style with Search)
+                // Left Navigation Drawer (Material 3 two-pane hierarchy)
                 Rectangle {
                     Layout.preferredWidth: 224
                     Layout.fillHeight: true
-                    color: MusicState.m3SurfaceContainerHigh
+                    color: MusicState.m3SurfaceContainerLow
+
+                    Rectangle {
+                        anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+                        width: 1
+                        color: MusicState.m3OutlineVariant
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 16
-                        spacing: 8
+                        spacing: 6
 
-                        // Search Settings Pill
+                        // Search Settings Pill (M3 Search Bar with visible focus outline)
                         Rectangle {
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 38
-                            Layout.bottomMargin: 4
-                            radius: 19
-                            color: MusicState.m3SurfaceContainer
+                            Layout.preferredHeight: 40
+                            Layout.bottomMargin: 6
+                            radius: 20
+                            color: MusicState.m3SurfaceContainerHigh
+                            border.width: 1
+                            border.color: cfgSearchInput.activeFocus ? MusicState.m3Outline : MusicState.m3OutlineVariant
 
                             RowLayout {
                                 anchors.fill: parent
@@ -144,7 +152,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 42
                                 radius: 21
-                                color: isSel ? MusicState.m3PrimaryContainer : (navMa.containsMouse ? MusicState.m3SurfaceContainerHighest : "transparent")
+                                color: isSel ? MusicState.m3SecondaryContainer : (navMa.containsMouse ? MusicState.m3SurfaceContainerHigh : "transparent")
                                 Behavior on color { ColorAnimation { duration: 150 } }
 
                                 RowLayout {
@@ -156,13 +164,13 @@ PanelWindow {
                                     SysIcon {
                                         name: modelData.icon
                                         size: 16
-                                        color: isSel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurfaceVariant
+                                        color: isSel ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurfaceVariant
                                     }
 
                                     Text {
                                         Layout.fillWidth: true
                                         text: modelData.label
-                                        color: isSel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
+                                        color: isSel ? MusicState.m3OnSecondaryContainer : MusicState.m3OnSurface
                                         font.family: MusicState.fontUi
                                         font.pixelSize: 12
                                         font.weight: isSel ? Font.Bold : Font.Medium
@@ -509,6 +517,31 @@ PanelWindow {
                                 }
                             }
 
+                            // Dynamic HUD & Window Borders Toggles
+                            Repeater {
+                                model: [
+                                    { key: "hudFromAlbum",       label: "Цвет HUD из обложки играющего трека",    val: ShellConfig.hudFromAlbum },
+                                    { key: "hyprDynamicBorders", label: "Динамическая рамка окон Hyprland под HUD", val: ShellConfig.hyprDynamicBorders }
+                                ]
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    Layout.fillWidth: true; Layout.preferredHeight: 50; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                    RowLayout {
+                                        anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16
+                                        Text { Layout.fillWidth: true; text: modelData.label; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium }
+                                        Rectangle {
+                                            Layout.preferredWidth: 46; Layout.preferredHeight: 26; radius: 13
+                                            color: modelData.val ? MusicState.m3Primary : MusicState.m3SurfaceContainer
+                                            Rectangle { width: 20; height: 20; radius: 10; y: 3; x: modelData.val ? 23 : 3; color: modelData.val ? MusicState.m3OnPrimary : MusicState.m3OnSurfaceVariant; Behavior on x { M3Anim { duration: 220 } } }
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                        onClicked: { ShellConfig[modelData.key] = !ShellConfig[modelData.key]; ShellConfig.save() }
+                                    }
+                                }
+                            }
+
                             // 24h Clock Toggle
                             Rectangle {
                                 Layout.fillWidth: true; Layout.preferredHeight: 50; radius: 18; color: MusicState.m3SurfaceContainerHigh
@@ -694,7 +727,9 @@ PanelWindow {
                                     { key: "dockPinned",          label: "Закрепить нижний док (не скрывать)",             val: ShellConfig.dockPinned },
                                     { key: "islandAutoClose",     label: "Автозакрытие островка при уводе курсора",        val: ShellConfig.islandAutoClose },
                                     { key: "showWeatherInIsland", label: "Показывать погоду в пилюле островка",            val: ShellConfig.showWeatherInIsland },
-                                    { key: "osdEnabled",          label: "Всплывающий OSD (звук, яркость, раскладка)",     val: ShellConfig.osdEnabled }
+                                    { key: "osdEnabled",          label: "Всплывающий OSD (звук, яркость, раскладка)",     val: ShellConfig.osdEnabled },
+                                    { key: "blurTiledBg",         label: "Размывать фон за тайловыми окнами",             val: ShellConfig.blurTiledBg },
+                                    { key: "kittyAutoFont",       label: "Авто-масштаб шрифта Kitty под размер окна",     val: ShellConfig.kittyAutoFont }
                                 ]
                                 delegate: Rectangle {
                                     required property var modelData
@@ -792,6 +827,7 @@ PanelWindow {
                                 model: [
                                     { key: "Super",           desc: "Открыть меню приложений (Приложения / Окна / Эмодзи)" },
                                     { key: "Super + W",       desc: "Карусель обоев (стрелки + свои папки)" },
+                                    { key: "Super + B",       desc: "3D-глобус веб-поиска с запуском Firefox" },
                                     { key: "Super + L",       desc: "Экран блокировки в стиле Caelestia" },
                                     { key: "Super + V",       desc: "История буфера обмена (cliphist)" },
                                     { key: "Super + Shift + S", desc: "Скриншот области (с лупой и редактором)" },
@@ -823,7 +859,7 @@ PanelWindow {
                                     Text { anchors.centerIn: parent; text: "Перезапустить AruShell"; color: MusicState.m3OnPrimaryContainer; font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold }
                                     MouseArea {
                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                        onClicked: Quickshell.execDetached(["bash", "-c", "pkill -9 -x quickshell; sleep 0.25; nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &"])
+                                        onClicked: Quickshell.execDetached(["bash", "-c", "systemctl --user restart arushell.service 2>/dev/null || (pkill -9 -x quickshell; sleep 0.25; nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &)"])
                                     }
                                 }
 
@@ -902,7 +938,8 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { k: "Пользователь", v: SystemState.userName || "user" },
+                                            { k: "Версия AruShell", v: "v1.1.0" },
+                                            { k: "Пользователь",    v: SystemState.userName || "user" },
                                             { k: "Хост",         v: SystemState.hostName || "linux" },
                                             { k: "Система",      v: SystemState.distroName || "CachyOS" },
                                             { k: "Ядро",         v: SystemState.kernelVer || "—" },

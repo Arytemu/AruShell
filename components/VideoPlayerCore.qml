@@ -25,23 +25,66 @@ Item {
         : 0
 
     readonly property bool desktopIsEmpty: !ShellConfig.videoEmptyDesktopOnly || openWindowCount === 0
-    readonly property bool shouldPlay: streamUrl !== "" && MusicState.hasTrack && MusicState.isPlaying && desktopIsEmpty
+    readonly property bool shouldPlay: streamUrl !== "" && MusicState.hasTrack && MusicState.isPlaying && desktopIsEmpty && !MusicState.stageMinimizedToIsland
 
     function syncPlayback() {
         if (streamUrl === "" || !MusicState.hasTrack) {
+            pauseBrakeAnim.stop()
+            resumeRampAnim.stop()
+            player.playbackRate = 1.0
             player.stop()
             player.source = ""
             return
         }
         if (String(player.source) !== streamUrl) {
+            pauseBrakeAnim.stop()
+            resumeRampAnim.stop()
+            player.playbackRate = 1.0
             player.stop()
             player.source = streamUrl
         }
         if (shouldPlay) {
-            player.play()
+            pauseBrakeAnim.stop()
+            if (player.playbackState !== MediaPlayer.PlayingState) {
+                player.playbackRate = 0.25
+                player.play()
+                resumeRampAnim.restart()
+            } else if (player.playbackRate < 0.99) {
+                resumeRampAnim.restart()
+            }
         } else {
-            player.pause()
+            resumeRampAnim.stop()
+            if (player.playbackState === MediaPlayer.PlayingState) {
+                pauseBrakeAnim.restart()
+            }
         }
+    }
+
+    // Smooth cinematic slow-down before pausing (no jarring freeze!)
+    SequentialAnimation {
+        id: pauseBrakeAnim
+        NumberAnimation {
+            target: player
+            property: "playbackRate"
+            to: 0.18
+            duration: 440
+            easing.type: Easing.OutCubic
+        }
+        ScriptAction {
+            script: {
+                if (!root.shouldPlay) player.pause()
+            }
+        }
+    }
+
+    // Smooth ramp-up when resuming playback
+    NumberAnimation {
+        id: resumeRampAnim
+        target: player
+        property: "playbackRate"
+        to: 1.0
+        duration: 360
+        easing.type: Easing.OutCubic
     }
 
     onStreamUrlChanged: syncPlayback()
@@ -72,7 +115,7 @@ Item {
         anchors.fill: parent
         fillMode: VideoOutput.PreserveAspectCrop
         orientation: MusicState.videoRotation
-        opacity: (root.streamUrl !== "" && MusicState.hasTrack && player.playbackState !== MediaPlayer.StoppedState) ? 1.0 : 0.0
+        opacity: (root.streamUrl !== "" && MusicState.hasTrack && MusicState.isPlaying && root.desktopIsEmpty && !MusicState.stageMinimizedToIsland) ? 1.0 : 0.0
 
         Behavior on opacity {
             NumberAnimation { duration: 420; easing.type: Easing.InOutCubic }

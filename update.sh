@@ -6,8 +6,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${HOME}/.config/quickshell/AruShell"
 
 echo "==> Быстрое обновление AruShell..."
+# Permanently stop & disable competing old shells (dms.service & rice-* daemons)
+systemctl --user stop arushell.service dms.service 2>/dev/null || true
+systemctl --user disable dms.service 2>/dev/null || true
+systemctl --user mask dms.service 2>/dev/null || true
 pkill -9 -x quickshell 2>/dev/null || true
 pkill -9 -x qs 2>/dev/null || true
+pkill -9 -f 'rice-desktop|rice-settings|rice-canvasd|rice-ws-watch|rice-rules|rice-update|rice-busy|rice-bar|rice-notifyd' 2>/dev/null || true
 sleep 0.25
 
 mkdir -p "${TARGET_DIR}"
@@ -16,10 +21,44 @@ rm -rf "${TARGET_DIR}/components" "${TARGET_DIR}/services" "${TARGET_DIR}/assets
 cp -r "${SCRIPT_DIR}/components" "${SCRIPT_DIR}/services" "${SCRIPT_DIR}/assets" "${SCRIPT_DIR}/sddm-theme" "${TARGET_DIR}/"
 chmod +x "${TARGET_DIR}/services/backend.py" \
          "${TARGET_DIR}/services/extract_color.py" \
+         "${TARGET_DIR}/services/websearch.py" \
+         "${TARGET_DIR}/services/kitty_autofont.py" \
          "${TARGET_DIR}/services/sysinfo.sh" \
          "${TARGET_DIR}/services/screenshot.sh"
 
-# Configure autostart, SUPER+W (wallpapers), SUPER+L (Caelestia Lock Screen), and 10-min hypridle auto-lock
+# 1. Bulletproof systemd user service for Hyprland (uwsm-managed) & reboot persistence!
+QS_BIN="$(command -v quickshell || echo /usr/bin/quickshell)"
+SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
+mkdir -p "${SYSTEMD_USER_DIR}"
+cat > "${SYSTEMD_USER_DIR}/arushell.service" <<EOF
+[Unit]
+Description=AruShell Material 3 Expressive Desktop Shell
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+KillMode=process
+ExecStartPre=-/usr/bin/pkill -x quickshell
+ExecStartPre=-/usr/bin/pkill -x qs
+ExecStart=${QS_BIN} -c AruShell
+Restart=on-failure
+RestartSec=1
+StandardOutput=append:/tmp/arushell.log
+StandardError=append:/tmp/arushell.log
+
+[Install]
+WantedBy=graphical-session.target
+EOF
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment HYPRLAND_INSTANCE_SIGNATURE WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP 2>/dev/null || true
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable arushell.service 2>/dev/null || true
+    echo "  [OK] Автозапуск настроен через systemd user service (arushell.service)"
+fi
+
+# 2. Configure SUPER+W (wallpapers), SUPER+L (Caelestia Lock Screen), and 10-min hypridle auto-lock
 HYPR_DIR="${HOME}/.config/hypr"
 if [ -d "${HYPR_DIR}" ]; then
     python3 - "${HYPR_DIR}" "${HOME}" <<'PYEOF'
@@ -69,14 +108,23 @@ for fp in all_cfgs:
             k in sl
             for k in (
                 "rice-lock",
-                "rice-dashboard wallpaper",
-                "hyprquickpaper",
-                "dms ipc call lock",
-                "ambient-music-shell",
-                "rice-bar start",
-                "rice-desktop start",
+                "rice-dashboard",
+                "rice-desktop",
+                "rice-settings",
+                "rice-canvasd",
+                "rice-ws-watch",
+                "rice-rules",
+                "rice-update",
+                "rice-busy",
+                "rice-bar",
                 "rice-notifyd",
                 "rice-walls",
+                "rice-start",
+                "hyprquickpaper",
+                "dms ipc",
+                "dms run",
+                "ambient-music-shell",
+                "quickshell/rice-",
             )
         )
         has_super_l = bool(
@@ -97,7 +145,6 @@ for fp in all_cfgs:
 lua_main = os.path.join(hypr_dir, "hyprland.lua")
 if os.path.isfile(lua_main):
     txt = open(lua_main, encoding="utf-8").read()
-    # Remove previous AruShell lock & wallpaper block so fresh binds + reboot-safe autostart sit at the end
     txt = re.sub(
         r"\n?-- AruShell lock & wallpaper binds.*?-- end AruShell lock & wallpaper binds[^\n]*\n?",
         "\n",
@@ -109,6 +156,8 @@ if os.path.isfile(lua_main):
         "\n",
         txt,
     )
+    # Remove any direct quickshell launch lines in hyprland.lua so systemd arushell.service is the single owner (never 2 shells!)
+    txt = re.sub(r'^[^\n]*hl\.exec_cmd\([^\n]*quickshell[^\n]*\)[^\n]*\n?', '', txt, flags=re.M)
     block = (
         "\n-- AruShell lock & wallpaper binds\n"
         'pcall(function() hl.unbind("SUPER + W") end)\n'
@@ -117,13 +166,22 @@ if os.path.isfile(lua_main):
         'pcall(function() hl.unbind("SUPER + L") end)\n'
         'pcall(function() hl.unbind("SUPER + l") end)\n'
         'hl.bind("SUPER + L", hl.dsp.exec_cmd("quickshell ipc -c AruShell call lock lock"))\n'
-        'hl.exec_cmd("sh -c \'sleep 0.8; pgrep -x quickshell >/dev/null || nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &\'")\n'
-        'hl.exec_cmd("pgrep -f \'cliphist store\' >/dev/null || nohup wl-paste --watch cliphist store >/dev/null 2>&1 &")\n'
-        'hl.exec_cmd("pgrep -x hypridle >/dev/null || nohup hypridle >/dev/null 2>&1 &")\n'
+        'pcall(function() hl.unbind("SUPER + B") end)\n'
+        'pcall(function() hl.unbind("SUPER + b") end)\n'
+        'hl.bind("SUPER + B", hl.dsp.exec_cmd("quickshell ipc -c AruShell call globe toggle"))\n'
+        'hl.config({ decoration = { active_opacity = 1.0, inactive_opacity = 0.94, fullscreen_opacity = 1.0, blur = { enabled = true, size = 7, passes = 3, vibrancy = 0.22, ignore_opacity = true, new_optimizations = true } } })\n'
+        'hl.window_rule({ name = "arushell-kitty-glass", match = { class = "kitty" }, opacity = "1.0 override 0.94 override" })\n'
+        'hl.window_rule({ name = "arushell-games-opaque", match = { class = "^(steam_app_.*|gamescope|mpv|vlc|firefox|zen)$" }, opacity = "1.0 override 1.0 override" })\n'
+        'hl.exec_cmd("pgrep -f cliphist >/dev/null || wl-paste --watch cliphist store")\n'
+        'hl.exec_cmd("pgrep -x hypridle >/dev/null || hypridle")\n'
         "-- end AruShell lock & wallpaper binds\n"
     )
-    open(lua_main, "w", encoding="utf-8").write(txt.rstrip() + "\n" + block)
-    print("  [OK] Автозапуск AruShell после перезагрузки, бинды SUPER+W/SUPER+L и hypridle обновлены в hyprland.lua")
+    orig_lua = open(lua_main, encoding="utf-8").read()
+    new_lua = txt.rstrip() + "\n" + block
+    if new_lua != orig_lua:
+        open(lua_main, "w", encoding="utf-8").write(new_lua)
+        open("/tmp/.arushell_hypr_changed", "w").write("1")
+        print("  [OK] Бинды SUPER+W, SUPER+L, SUPER+B и автозапуск обновлены в hyprland.lua")
 PYEOF
 
     cat > "${HYPR_DIR}/hypridle.conf" <<'IDLEEOF'
@@ -140,22 +198,66 @@ listener {
 IDLEEOF
     echo "  [OK] Настроен автолок через 10 минут бездействия (${HYPR_DIR}/hypridle.conf)"
 
-    hyprctl reload >/dev/null 2>&1 || true
-    sleep 0.3
+    # Only reload Hyprland when hyprland.lua actually changed (avoids freezing Electron/YandexMusic!)
+    if [ -f /tmp/.arushell_hypr_changed ]; then
+        rm -f /tmp/.arushell_hypr_changed
+        hyprctl reload >/dev/null 2>&1 || true
+        sleep 0.3
+    fi
 fi
+
+
+# 3. Glassy translucent background for GTK3 & GTK4 apps (Nautilus/Files, etc.) — text & icons stay 100% crisp!
+for GTK_VER in gtk-3.0 gtk-4.0; do
+    GTK_DIR="${HOME}/.config/${GTK_VER}"
+    GTK_CSS="${GTK_DIR}/gtk.css"
+    mkdir -p "${GTK_DIR}"
+    touch "${GTK_CSS}"
+    python3 - "${GTK_CSS}" <<'GTKEOF'
+import re, sys
+p = sys.argv[1]
+txt = open(p, encoding="utf-8").read()
+txt = re.sub(r"\n?/\* AruShell Glass Background \*/.*?/\* end AruShell Glass Background \*/\n?", "\n", txt, flags=re.S)
+block = '''
+/* AruShell Glass Background */
+window.background,
+window.background > box,
+.nautilus-window,
+.nautilus-window paned,
+.nautilus-window scrolledwindow,
+navigation-split-view,
+navigation-view-page,
+headerbar,
+.navigation-sidebar,
+sidebar {
+    background-color: rgba(20, 19, 24, 0.78);
+}
+popover > contents,
+menu {
+    background-color: rgba(26, 25, 32, 0.86);
+}
+/* end AruShell Glass Background */
+'''
+open(p, "w", encoding="utf-8").write(txt.rstrip() + "\n" + block)
+GTKEOF
+done
+echo "  [OK] Настроен полупрозрачный фон (без замутнения текста) для GTK3/GTK4 окон"
 
 if command -v hypridle >/dev/null 2>&1; then
     pkill -x hypridle 2>/dev/null || true
     nohup hypridle >/dev/null 2>&1 &
-else
-    echo "  [!] Для автоблокировки через 10 мин установите hypridle: sudo pacman -S hypridle"
 fi
 
 rm -rf "${HOME}/.cache/quickshell/qmlcache" 2>/dev/null || true
-if ! pgrep -x quickshell >/dev/null 2>&1; then
-    nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &
+if command -v systemctl >/dev/null 2>&1 && systemctl --user restart arushell.service 2>/dev/null; then
+    sleep 0.6
+else
+    if ! pgrep -x quickshell >/dev/null 2>&1; then
+        nohup quickshell -c AruShell >/tmp/arushell.log 2>&1 &
+    fi
+    sleep 0.8
 fi
-sleep 0.8
+
 if pgrep -x quickshell >/dev/null 2>&1; then
     echo "Готово! AruShell обновлён и запущен (лог: /tmp/arushell.log)."
 else

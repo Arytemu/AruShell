@@ -47,6 +47,7 @@ Singleton {
 
     // --- UI Overlay States ---
     property bool platformMenuOpen: false
+    property bool stageMinimizedToIsland: false
     property bool searchOpen: false
     property string searchQuery: ""
     property bool searchLoading: false
@@ -64,6 +65,50 @@ Singleton {
     property var lyricsLines: []
     property bool lyricsSynced: false
     property string lyricsSource: ""
+    // Thematic genre-adaptive typography fonts (Rap / Rock / Electronic / Soul)
+    FontLoader { id: genreFontRap;  source: "../assets/fonts/BebasNeue-Regular.ttf" }
+    FontLoader { id: genreFontRock; source: "../assets/fonts/InterDisplay-BlackItalic.otf" }
+    FontLoader { id: genreFontElec; source: "../assets/fonts/URWGothic-Demi.otf" }
+    FontLoader { id: genreFontSoul; source: "../assets/fonts/P052-BoldItalic.otf" }
+
+    property string trackGenre: "pop"
+    property string _pendingGenre: "pop"
+    property real moodFontOpacity: 1.0
+    property real moodFontScale: 1.0
+
+    Behavior on moodFontOpacity { NumberAnimation { duration: 190; easing.type: Easing.InOutCubic } }
+    Behavior on moodFontScale   { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+    Timer {
+        id: genreSwapTimer
+        interval: 195
+        repeat: false
+        onTriggered: {
+            root.trackGenre = root._pendingGenre
+            root.moodFontOpacity = 1.0
+            root.moodFontScale = 1.0
+        }
+    }
+
+    function setTrackGenreSmooth(nextGenre) {
+        const g = String(nextGenre || "pop")
+        if (g === trackGenre && !genreSwapTimer.running) return
+        _pendingGenre = g
+        moodFontOpacity = 0.0
+        moodFontScale = 0.94
+        genreSwapTimer.restart()
+    }
+
+    readonly property string trackMoodFont: {
+        if (trackGenre === "rap" && genreFontRap.status === FontLoader.Ready) return genreFontRap.name
+        if (trackGenre === "rock" && genreFontRock.status === FontLoader.Ready) return genreFontRock.name
+        if (trackGenre === "electronic" && genreFontElec.status === FontLoader.Ready) return genreFontElec.name
+        if (trackGenre === "soul" && genreFontSoul.status === FontLoader.Ready) return genreFontSoul.name
+        return fontUi
+    }
+    readonly property bool trackMoodItalic: trackGenre === "soul" || trackGenre === "rock"
+    readonly property real trackMoodSpacing: trackGenre === "rap" ? 1.8 : (trackGenre === "electronic" ? 1.1 : (trackGenre === "rock" ? 0.5 : 0.0))
+
     property int lyricsAltIndex: 0
     property int lyricsTotalVariants: 0
     property int currentLyricIndex: -1
@@ -312,10 +357,14 @@ Singleton {
     // Extracted vibrant dominant hex color from current wallpaper (populated by WallpaperState)
     property string wallSeedHex: ""
 
-    // Dynamic Material You seed: manual override -> extracted wallpaper color -> wallQuantizer -> album art -> fallback
+    // Dynamic Material You seed: manual override -> playing album art (when not minimized) -> wallpaper -> fallback
     readonly property color seedColor: {
         if (ShellConfig.accentOverride !== "") {
             return Qt.color(ShellConfig.accentOverride)
+        }
+        if (ShellConfig.hudFromAlbum && root.hasTrack && root.isPlaying && !root.stageMinimizedToIsland && ShellConfig.stageVisible) {
+            const ac = pickBestColor(quantizer.colors)
+            if (ac) return ac
         }
         if (ShellConfig.wallpaperPath !== "" && root.wallSeedHex !== "") {
             return Qt.color(root.wallSeedHex)
@@ -324,8 +373,6 @@ Singleton {
         if (ShellConfig.wallpaperPath !== "" && wc) {
             return wc
         }
-        const ac = pickBestColor(quantizer.colors)
-        if (ac) return ac
         return Qt.color(currentPlatformObj.accent || "#D0BCFF")
     }
 
@@ -335,50 +382,193 @@ Singleton {
     readonly property bool _dark: ShellConfig.darkTheme
     readonly property real _op: Math.max(0.65, Math.min(1.0, ShellConfig.panelOpacity))
 
-    // Animated Material 3 tonal tokens (supports Dark & Light theme + live transparency)
+    readonly property real _secSat: Math.max(0.14, Math.min(0.32, _seedSat * 0.44))
+    readonly property real _tertHue: (_seedHue + 0.1667) % 1.0 // +60deg Material You tonal harmony
+    readonly property real _tertSat: Math.max(0.26, Math.min(0.68, _seedSat * 0.82))
+
+    // =========================================================================
+    // Material Design 3 Semantic Token System (Dark & Light + Dynamic Color)
+    // =========================================================================
+
+    // Primary role (highest-emphasis branded actions — used selectively)
     property color m3Primary: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.76, _seedSat + 0.12), 0.78, 1.0)
-        : Qt.hsla(_seedHue, Math.min(0.72, _seedSat + 0.10), 0.38, 1.0)
+        ? Qt.hsla(_seedHue, Math.min(0.78, _seedSat + 0.12), 0.79, 1.0)
+        : Qt.hsla(_seedHue, Math.min(0.74, _seedSat + 0.10), 0.37, 1.0)
     property color m3OnPrimary: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.55, _seedSat), 0.15, 1.0)
-        : Qt.hsla(_seedHue, 0.10, 0.98, 1.0)
+        ? Qt.hsla(_seedHue, Math.min(0.55, _seedSat), 0.14, 1.0)
+        : Qt.hsla(_seedHue, 0.10, 0.99, 1.0)
     property color m3PrimaryContainer: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.52, _seedSat * 0.85), 0.27, Math.min(1.0, _op + 0.03))
-        : Qt.hsla(_seedHue, Math.min(0.60, _seedSat * 0.80), 0.86, Math.min(1.0, _op + 0.03))
+        ? Qt.hsla(_seedHue, Math.min(0.54, _seedSat * 0.86), 0.27, Math.min(1.0, _op + 0.04))
+        : Qt.hsla(_seedHue, Math.min(0.64, _seedSat * 0.84), 0.87, Math.min(1.0, _op + 0.04))
     property color m3OnPrimaryContainer: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.65, _seedSat), 0.91, 1.0)
-        : Qt.hsla(_seedHue, Math.min(0.65, _seedSat), 0.16, 1.0)
+        ? Qt.hsla(_seedHue, Math.min(0.68, _seedSat), 0.92, 1.0)
+        : Qt.hsla(_seedHue, Math.min(0.68, _seedSat), 0.15, 1.0)
+
+    // Secondary role (supporting emphasis: active nav indicators, tonal pills, secondary toggles)
+    property color m3Secondary: _dark
+        ? Qt.hsla(_seedHue, _secSat, 0.78, 1.0)
+        : Qt.hsla(_seedHue, _secSat, 0.40, 1.0)
+    property color m3OnSecondary: _dark
+        ? Qt.hsla(_seedHue, _secSat, 0.16, 1.0)
+        : Qt.hsla(_seedHue, 0.08, 0.99, 1.0)
+    property color m3SecondaryContainer: _dark
+        ? Qt.hsla(_seedHue, _secSat + 0.04, 0.25, Math.min(1.0, _op + 0.03))
+        : Qt.hsla(_seedHue, _secSat + 0.06, 0.86, Math.min(1.0, _op + 0.03))
+    property color m3OnSecondaryContainer: _dark
+        ? Qt.hsla(_seedHue, _secSat, 0.91, 1.0)
+        : Qt.hsla(_seedHue, _secSat + 0.06, 0.16, 1.0)
+
+    // Tertiary role (contrasting +60deg expressive accent: modes, media/weather highlights, DND)
+    property color m3Tertiary: _dark
+        ? Qt.hsla(_tertHue, _tertSat, 0.80, 1.0)
+        : Qt.hsla(_tertHue, _tertSat, 0.39, 1.0)
+    property color m3OnTertiary: _dark
+        ? Qt.hsla(_tertHue, _tertSat * 0.7, 0.15, 1.0)
+        : Qt.hsla(_tertHue, 0.10, 0.99, 1.0)
+    property color m3TertiaryContainer: _dark
+        ? Qt.hsla(_tertHue, _tertSat * 0.78, 0.26, Math.min(1.0, _op + 0.03))
+        : Qt.hsla(_tertHue, _tertSat * 0.80, 0.87, Math.min(1.0, _op + 0.03))
+    property color m3OnTertiaryContainer: _dark
+        ? Qt.hsla(_tertHue, _tertSat * 0.85, 0.92, 1.0)
+        : Qt.hsla(_tertHue, _tertSat * 0.85, 0.16, 1.0)
+
+    // Surface hierarchy (5-step M3 tonal elevation from Lowest to Highest)
+    property color m3Surface: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.20, _seedSat * 0.32), 0.08, _op)
+        : Qt.hsla(_seedHue, Math.min(0.18, _seedSat * 0.26), 0.98, _op)
+    property color m3SurfaceContainerLowest: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.18, _seedSat * 0.28), 0.06, _op)
+        : Qt.hsla(_seedHue, Math.min(0.14, _seedSat * 0.20), 1.00, _op)
+    property color m3SurfaceContainerLow: _dark
+        ? Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.36), 0.10, _op)
+        : Qt.hsla(_seedHue, Math.min(0.20, _seedSat * 0.30), 0.96, _op)
     property color m3SurfaceContainer: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.28, _seedSat * 0.45), 0.12, _op)
-        : Qt.hsla(_seedHue, Math.min(0.24, _seedSat * 0.35), 0.94, _op)
+        ? Qt.hsla(_seedHue, Math.min(0.25, _seedSat * 0.42), 0.13, _op)
+        : Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.34), 0.93, _op)
     property color m3SurfaceContainerHigh: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.30, _seedSat * 0.48), 0.18, Math.min(1.0, _op + 0.02))
-        : Qt.hsla(_seedHue, Math.min(0.24, _seedSat * 0.35), 0.89, Math.min(1.0, _op + 0.02))
+        ? Qt.hsla(_seedHue, Math.min(0.27, _seedSat * 0.44), 0.18, Math.min(1.0, _op + 0.02))
+        : Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.34), 0.89, Math.min(1.0, _op + 0.02))
     property color m3SurfaceContainerHighest: _dark
-        ? Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.38), 0.24, Math.min(1.0, _op + 0.03))
-        : Qt.hsla(_seedHue, Math.min(0.22, _seedSat * 0.32), 0.84, Math.min(1.0, _op + 0.03))
+        ? Qt.hsla(_seedHue, Math.min(0.24, _seedSat * 0.40), 0.24, Math.min(1.0, _op + 0.04))
+        : Qt.hsla(_seedHue, Math.min(0.20, _seedSat * 0.30), 0.84, Math.min(1.0, _op + 0.04))
+
+    // Content & Outline roles (WCAG AA >= 4.5:1 contrast)
     property color m3OnSurface: _dark
-        ? Qt.hsla(_seedHue, 0.10, 0.94, 1.0)
-        : Qt.hsla(_seedHue, 0.14, 0.12, 1.0)
+        ? Qt.hsla(_seedHue, 0.09, 0.94, 1.0)
+        : Qt.hsla(_seedHue, 0.14, 0.11, 1.0)
     property color m3OnSurfaceVariant: _dark
-        ? Qt.hsla(_seedHue, 0.12, 0.74, 1.0)
-        : Qt.hsla(_seedHue, 0.12, 0.34, 1.0)
+        ? Qt.hsla(_seedHue, 0.12, 0.76, 1.0)
+        : Qt.hsla(_seedHue, 0.12, 0.32, 1.0)
+    property color m3Outline: _dark
+        ? Qt.hsla(_seedHue, 0.14, 0.56, 0.65)
+        : Qt.hsla(_seedHue, 0.14, 0.46, 0.62)
     property color m3OutlineVariant: _dark
-        ? Qt.hsla(_seedHue, 0.16, 0.34, 0.32)
-        : Qt.hsla(_seedHue, 0.16, 0.65, 0.42)
+        ? Qt.hsla(_seedHue, 0.16, 0.42, 0.28)
+        : Qt.hsla(_seedHue, 0.16, 0.54, 0.30)
+
+    // Error / Destructive role (Power off, Reboot, Clear, Urgent alerts)
+    property color m3Error: _dark
+        ? Qt.hsla(0.985, 0.82, 0.78, 1.0)
+        : Qt.hsla(0.985, 0.72, 0.42, 1.0)
+    property color m3OnError: _dark
+        ? Qt.hsla(0.985, 0.68, 0.16, 1.0)
+        : Qt.hsla(0.0, 0.0, 1.0, 1.0)
+    property color m3ErrorContainer: _dark
+        ? Qt.hsla(0.985, 0.62, 0.24, Math.min(1.0, _op + 0.04))
+        : Qt.hsla(0.985, 0.78, 0.89, Math.min(1.0, _op + 0.04))
+    property color m3OnErrorContainer: _dark
+        ? Qt.hsla(0.985, 0.85, 0.92, 1.0)
+        : Qt.hsla(0.985, 0.75, 0.16, 1.0)
+
+    // Reusable M3 Shape Scale tokens (prevents arbitrary 11/13/15/17/26px drift)
+    readonly property int shapeXs: 4
+    readonly property int shapeSm: 8
+    readonly property int shapeMd: 12
+    readonly property int shapeLg: 16
+    readonly property int shapeXl: 28
+    readonly property int shapeFull: 999
+
+    // Reusable M3 Spacing Scale (4dp rhythm)
+    readonly property int spaceXs: 4
+    readonly property int spaceSm: 8
+    readonly property int spaceMd: 12
+    readonly property int spaceLg: 16
+    readonly property int spaceXl: 24
+
+    // Reusable M3 Typography Scale (semantic sizes)
+    readonly property int typeHeadlineSm: 22
+    readonly property int typeTitleLg: 18
+    readonly property int typeTitleMd: 15
+    readonly property int typeTitleSm: 13
+    readonly property int typeBodyMd: 13
+    readonly property int typeBodySm: 12
+    readonly property int typeLabelLg: 12
+    readonly property int typeLabelMd: 11
+    readonly property int typeLabelSm: 10
 
     // Backwards-compatible aliases
     readonly property color accentColor: m3Primary
     readonly property color secondaryAccentColor: m3PrimaryContainer
 
-    Behavior on m3Primary               { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3OnPrimary             { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3PrimaryContainer      { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3OnPrimaryContainer    { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3SurfaceContainer      { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3SurfaceContainerHigh  { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3OnSurface             { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
-    Behavior on m3OnSurfaceVariant      { ColorAnimation { duration: 750; easing.type: Easing.InOutCubic } }
+    function _hexNoHash(c) {
+        const r = Math.max(0, Math.min(255, Math.round(c.r * 255))).toString(16).padStart(2, "0")
+        const g = Math.max(0, Math.min(255, Math.round(c.g * 255))).toString(16).padStart(2, "0")
+        const b = Math.max(0, Math.min(255, Math.round(c.b * 255))).toString(16).padStart(2, "0")
+        return r + g + b
+    }
+
+    function syncHyprBorders() {
+        if (!ShellConfig.hyprDynamicBorders) return
+        const c1 = root._hexNoHash(root.m3Primary)
+        const c2 = root._hexNoHash(root.m3PrimaryContainer)
+        const ci = root._hexNoHash(root.m3SurfaceContainerHighest)
+        const luaCmd = 'hl.config({ general = { col = { active_border = { colors = {"rgba(' + c1 + 'ee)", "rgba(' + c2 + 'cc)"}, angle = 45 }, inactive_border = "rgba(' + ci + '55)" } } })'
+        const activeLegacy = "rgba(" + c1 + "ee) rgba(" + c2 + "cc) 45deg"
+        const inactiveLegacy = "rgba(" + ci + "55)"
+        Quickshell.execDetached([
+            "bash", "-c",
+            'SIG="${HYPRLAND_INSTANCE_SIGNATURE:-}"; if [ -z "$SIG" ] || [ ! -S "/run/user/$(id -u)/hypr/$SIG/.socket.sock" ]; then SIG="$(ls -t "/run/user/$(id -u)/hypr" 2>/dev/null | head -n 1)"; fi; export HYPRLAND_INSTANCE_SIGNATURE="$SIG"; if command -v hyprctl >/dev/null 2>&1 && [ -n "$SIG" ]; then hyprctl eval "$1" >/dev/null 2>&1 || { hyprctl keyword general:col.active_border "$2" >/dev/null 2>&1; hyprctl keyword general:col.inactive_border "$3" >/dev/null 2>&1; }; fi',
+            "_", luaCmd, activeLegacy, inactiveLegacy
+        ])
+    }
+
+    Timer {
+        id: hyprBorderSyncTimer
+        interval: 320
+        repeat: false
+        onTriggered: root.syncHyprBorders()
+    }
+
+    onM3PrimaryChanged: hyprBorderSyncTimer.restart()
+    onSeedColorChanged: hyprBorderSyncTimer.restart()
+    Component.onCompleted: hyprBorderSyncTimer.restart()
+
+    Behavior on m3Primary               { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnPrimary             { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3PrimaryContainer      { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnPrimaryContainer    { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3Secondary             { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnSecondary           { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SecondaryContainer    { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnSecondaryContainer  { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3Tertiary              { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnTertiary            { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3TertiaryContainer     { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnTertiaryContainer   { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3Surface               { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SurfaceContainerLowest { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SurfaceContainerLow   { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SurfaceContainer      { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SurfaceContainerHigh  { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3SurfaceContainerHighest { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnSurface             { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnSurfaceVariant      { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3Outline               { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OutlineVariant        { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3Error                 { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnError               { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3ErrorContainer        { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
+    Behavior on m3OnErrorContainer      { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }
 
     Timer {
         id: trackChangeDebounce
@@ -397,7 +587,7 @@ Singleton {
 
     Timer {
         interval: 150
-        running: true
+        running: root.hasTrack && root.isPlaying
         repeat: true
         onTriggered: {
             if (root.useInternalPlayer) {
@@ -444,6 +634,7 @@ Singleton {
 
         lyricsAltIndex = 0
         lyricsLines = []
+        setTrackGenreSmooth("pop")
         lyricsSynced = false
         currentLyricIndex = -1
         videoStreamUrl = ""
@@ -730,6 +921,7 @@ Singleton {
                     root.lyricsLines = data.lines || []
                     root.lyricsSource = data.source || ""
                     root.lyricsTotalVariants = data.total || 0
+                    if (data.genre) root.setTrackGenreSmooth(String(data.genre))
                     root.updateActiveLyric()
                 } catch (e) {
                     root.lyricsLines = []

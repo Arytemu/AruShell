@@ -58,6 +58,20 @@ Singleton {
     property int pillIconSize: 16
     property int pillSpacing: 10
     property int pillPadding: 24
+    property var recentApps: []
+    property bool hudFromAlbum: true
+    property bool hyprDynamicBorders: true
+    property bool blurTiledBg: true
+    property bool kittyAutoFont: true
+
+    function recordRecentApp(appKey) {
+        const k = String(appKey || "").trim()
+        if (!k) return
+        const list = (recentApps || []).filter(function(x) { return x !== k })
+        list.unshift(k)
+        recentApps = list.slice(0, 8)
+        save()
+    }
 
     readonly property string settingsPath: Qt.resolvedUrl("../settings.json").toString().replace("file://", "")
     property bool _loaded: false
@@ -208,7 +222,12 @@ Singleton {
             qsSpacing: qsSpacing,
             pillIconSize: pillIconSize,
             pillSpacing: pillSpacing,
-            pillPadding: pillPadding
+            pillPadding: pillPadding,
+            recentApps: recentApps,
+            hudFromAlbum: hudFromAlbum,
+            hyprDynamicBorders: hyprDynamicBorders,
+            blurTiledBg: blurTiledBg,
+            kittyAutoFont: kittyAutoFont
         }, null, 2)
         Quickshell.execDetached(["python3", "-c", "import sys; open(sys.argv[1], 'w', encoding='utf-8').write(sys.argv[2])", settingsPath, payload])
     }
@@ -289,6 +308,11 @@ Singleton {
                 if (d.pillIconSize !== undefined) root.pillIconSize = Math.max(13, Math.min(22, Number(d.pillIconSize)))
                 if (d.pillSpacing !== undefined) root.pillSpacing = Math.max(6, Math.min(20, Number(d.pillSpacing)))
                 if (d.pillPadding !== undefined) root.pillPadding = Math.max(16, Math.min(48, Number(d.pillPadding)))
+                if (Array.isArray(d.recentApps)) root.recentApps = d.recentApps
+                if (d.hudFromAlbum !== undefined) root.hudFromAlbum = !!d.hudFromAlbum
+                if (d.hyprDynamicBorders !== undefined) root.hyprDynamicBorders = !!d.hyprDynamicBorders
+                if (d.blurTiledBg !== undefined) root.blurTiledBg = !!d.blurTiledBg
+                if (d.kittyAutoFont !== undefined) root.kittyAutoFont = !!d.kittyAutoFont
             } catch (e) {}
             loadProc.buf = ""
             root._loaded = true

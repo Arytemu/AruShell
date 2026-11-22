@@ -34,8 +34,10 @@ Item {
         id: menuCard
         width: 248
         height: menuCol.implicitHeight + 16
-        radius: 22
-        color: MusicState.m3SurfaceContainer
+        radius: MusicState.shapeLg
+        color: MusicState.m3SurfaceContainerHigh
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         x: Math.max(12, Math.min(root.width - width - 12, ShellConfig.desktopMenuX))
         y: Math.max(56, Math.min(root.height - height - 16, ShellConfig.desktopMenuY))
@@ -152,7 +154,7 @@ Item {
                                 } else if (act === "settings") {
                                     ShellConfig.openSettings()
                                 } else if (act === "reload") {
-                                    Quickshell.reload(true)
+                                    Quickshell.execDetached(["bash", "-c", "systemctl --user restart arushell.service 2>/dev/null || true"])
                                 }
                             }
                         }

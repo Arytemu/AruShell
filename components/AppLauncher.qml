@@ -85,6 +85,14 @@ Item {
                 if (hay.indexOf(q) !== -1) apps.push(app)
             }
         }
+        const rec = ShellConfig.recentApps || []
+        function recentRank(appObj) {
+            const idKey = String(appObj.id || "")
+            const nameKey = String(appObj.name || "")
+            let idx = idKey ? rec.indexOf(idKey) : -1
+            if (idx === -1 && nameKey) idx = rec.indexOf(nameKey)
+            return idx
+        }
         apps.sort(function(a, b) {
             const an = String(a.name || "").toLowerCase()
             const bn = String(b.name || "").toLowerCase()
@@ -92,11 +100,25 @@ Item {
                 const aS = an.startsWith(q) ? 0 : 1
                 const bS = bn.startsWith(q) ? 0 : 1
                 if (aS !== bS) return aS - bS
+            } else {
+                const ar = recentRank(a)
+                const br = recentRank(b)
+                if (ar !== -1 && br !== -1) return ar - br
+                if (ar !== -1) return -1
+                if (br !== -1) return 1
             }
             return an.localeCompare(bn)
         })
         for (let j = 0; j < apps.length; j++) {
-            out.push({ kind: "app", app: apps[j], name: apps[j].name || "", desc: apps[j].genericName || apps[j].comment || "", icon: apps[j].icon || "" })
+            const rIdx = recentRank(apps[j])
+            out.push({
+                kind: "app",
+                app: apps[j],
+                isRecent: q === "" && rIdx !== -1,
+                name: apps[j].name || "",
+                desc: apps[j].genericName || apps[j].comment || "",
+                icon: apps[j].icon || ""
+            })
         }
         return out
     }
@@ -155,6 +177,7 @@ Item {
             const item = list[Math.max(0, Math.min(selectedIndex, list.length - 1))]
             if (item.kind === "cmd") runSysCommand(item.action)
             else if (item.app) {
+                ShellConfig.recordRecentApp(item.app.id || item.name)
                 try { item.app.execute() } catch (e) {}
                 SystemState.launcherOpen = false
             }
@@ -202,8 +225,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 28
+        radius: MusicState.shapeXl
         color: MusicState.m3SurfaceContainer
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         MouseArea { anchors.fill: parent }
 
@@ -212,12 +237,14 @@ Item {
             anchors.margins: 16
             spacing: 12
 
-            // Search Input Pill
+            // Search Input Pill (M3 Search Bar with visible focus outline)
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
                 radius: 22
                 color: MusicState.m3SurfaceContainerHigh
+                border.width: 1
+                border.color: searchInput.activeFocus ? MusicState.m3Outline : MusicState.m3OutlineVariant
 
                 RowLayout {
                     anchors.fill: parent
@@ -372,7 +399,7 @@ Item {
                     required property int index
                     readonly property bool isSel: index === root.selectedIndex
 
-                    width: appList.width
+                    width: Math.max(0, appList.width || 0)
                     height: 50
                     radius: 15
                     color: isSel ? MusicState.m3PrimaryContainer : (aMa.containsMouse ? MusicState.m3SurfaceContainerHigh : "transparent")
@@ -441,6 +468,26 @@ Item {
                                 elide: Text.ElideRight
                             }
                         }
+
+                        // Subtle Material 3 badge for recently launched apps
+                        Rectangle {
+                            visible: modelData.isRecent === true
+                            Layout.preferredHeight: 20
+                            Layout.preferredWidth: recBadgeTxt.implicitWidth + 12
+                            Layout.alignment: Qt.AlignVCenter
+                            radius: 10
+                            color: isSel ? MusicState.m3Primary : MusicState.m3SecondaryContainer
+
+                            Text {
+                                id: recBadgeTxt
+                                anchors.centerIn: parent
+                                text: "Недавнее"
+                                color: isSel ? MusicState.m3OnPrimary : MusicState.m3OnSecondaryContainer
+                                font.family: MusicState.fontUi
+                                font.pixelSize: 9
+                                font.weight: Font.Bold
+                            }
+                        }
                     }
 
                     MouseArea {
@@ -472,7 +519,7 @@ Item {
                     required property int index
                     readonly property bool isSel: index === root.selectedIndex
 
-                    width: winList.width
+                    width: Math.max(0, winList.width || 0)
                     height: 50
                     radius: 15
                     color: isSel ? MusicState.m3PrimaryContainer : (wMa.containsMouse ? MusicState.m3SurfaceContainerHigh : "transparent")

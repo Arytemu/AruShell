@@ -57,7 +57,9 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 26
+        radius: MusicState.shapeXl
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
         color: MusicState.m3SurfaceContainer
 
         MouseArea { anchors.fill: parent }

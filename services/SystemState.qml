@@ -16,6 +16,11 @@ Singleton {
     id: root
 
     property bool quickSettingsOpen: false
+    property bool langMenuOpen: false
+    property var kbdLayouts: [
+        { index: 0, code: "EN", name: "English (US)" },
+        { index: 1, code: "RU", name: "Русский" }
+    ]
     property bool launcherOpen: false
     property string quickSettingsSubmenu: "" // "" | "wifi" | "bt" | "audio"
 
@@ -112,11 +117,24 @@ Singleton {
         return String(layoutName).trim().slice(0, 2).toUpperCase()
     }
 
-    // Instant 0ms keyboard layout detection via Hyprland IPC `activelayout>>keyboard,layout`
+    readonly property string kittyAutofontScript: Qt.resolvedUrl("kitty_autofont.py").toString().replace("file://", "")
+
+    Timer {
+        id: kittyAutofontDebounce
+        interval: 160
+        repeat: false
+        onTriggered: if (ShellConfig.kittyAutoFont) Quickshell.execDetached(["python3", root.kittyAutofontScript])
+    }
+
+    // Instant 0ms keyboard layout detection + responsive Kitty font sizing on Hyprland events
     Connections {
         target: Hyprland
         function onRawEvent(ev) {
-            if (!ev || ev.name !== "activelayout") return
+            if (!ev) return
+            if (ev.name === "openwindow" || ev.name === "closewindow" || ev.name === "movewindow" || ev.name === "changefloatingmode" || ev.name === "fullscreen" || ev.name === "activewindow") {
+                kittyAutofontDebounce.restart()
+            }
+            if (ev.name !== "activelayout") return
             const raw = String(ev.data || "")
             const comma = raw.lastIndexOf(",")
             const layoutName = comma !== -1 ? raw.slice(comma + 1).trim() : raw.trim()
@@ -135,10 +153,37 @@ Singleton {
         onTriggered: root.osdVisible = false
     }
 
+    function toggleLangMenu() {
+        langMenuOpen = !langMenuOpen
+        if (langMenuOpen) {
+            quickSettingsOpen = false
+            quickSettingsSubmenu = ""
+            wifiPasswordTarget = ""
+            launcherOpen = false
+            ClipboardState.open = false
+            NotifState.closeAllPopups()
+            refreshLayouts()
+        }
+    }
+
+    function refreshLayouts() {
+        if (!layoutListProc.running) {
+            layoutListProc.command = ["bash", sysScript, "list-layouts"]
+            layoutListProc.running = true
+        }
+    }
+
+    function setKeyboardLayout(idx, code) {
+        if (code) root.kbdLayout = code
+        runCmd("bash " + JSON.stringify(sysScript) + " set-layout " + String(idx))
+        langMenuOpen = false
+    }
+
     function toggleLauncher() {
         launcherOpen = !launcherOpen
         if (launcherOpen) {
             quickSettingsOpen = false
+            langMenuOpen = false
             quickSettingsSubmenu = ""
         wifiPasswordTarget = ""
         wifiStatusMsg = ""
@@ -148,6 +193,7 @@ Singleton {
     }
 
     function toggleQuickSettings() {
+        langMenuOpen = false
         launcherOpen = false
         ClipboardState.open = false
         quickSettingsOpen = !quickSettingsOpen
@@ -441,6 +487,22 @@ Singleton {
                     } else {
                         root._firstPollDone = true
                     }
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: layoutListProc
+        stdout: SplitParser {
+            splitMarker: "
+"
+            onRead: function(line) {
+                const s = line.trim()
+                if (!s.startsWith("[")) return
+                try {
+                    const arr = JSON.parse(s)
+                    if (arr && arr.length > 0) root.kbdLayouts = arr
                 } catch (e) {}
             }
         }

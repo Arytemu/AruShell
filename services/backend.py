@@ -26,7 +26,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config.json"
 VENV_BIN = BASE_DIR / ".venv" / "bin"
-CACHE_DIR = Path.home() / ".cache" / "ambient-music-shell"
+CACHE_DIR = Path.home() / ".cache" / "arushell"
 QUEUE_FILE = CACHE_DIR / "queue.json"
 DEBUG_LOG = CACHE_DIR / "debug.log"
 
@@ -532,6 +532,36 @@ def fetch_yandex_lyrics(title: str, artist: str, cfg: dict):
     return None
 
 
+
+def detect_track_genre(title: str, artist: str) -> str:
+    """Classify track genre into: rap | rock | electronic | soul | pop."""
+    hay = f"{title} {artist}".lower()
+    if any(k in hay for k in ("phonk", "trap", "drill", "freestyle", "рэп", "rap", "hip-hop", "hip hop")):
+        return "rap"
+    if any(k in hay for k in ("metal", "rock", "punk", "grunge", "рок", "метал", "панк")):
+        return "rock"
+    if any(k in hay for k in ("techno", "house", "dnb", "drum and bass", "synthwave", "remix", "edm", "dubstep", "trance")):
+        return "electronic"
+    if any(k in hay for k in ("jazz", "classical", "piano", "orchestra", "acoustic", "lo-fi", "lofi", "soul", "blues")):
+        return "soul"
+    try:
+        q = urllib.parse.urlencode({"term": f"{artist} {title}".strip(), "media": "music", "limit": 1})
+        res = http_get_json(f"https://itunes.apple.com/search?{q}", timeout=2.5)
+        items = (res or {}).get("results") or []
+        if items:
+            g = str(items[0].get("primaryGenreName") or "").lower()
+            if any(k in g for k in ("hip-hop", "rap", "hip hop")):
+                return "rap"
+            if any(k in g for k in ("rock", "metal", "punk", "alternative", "hard rock")):
+                return "rock"
+            if any(k in g for k in ("electronic", "dance", "house", "techno", "trance", "dubstep")):
+                return "electronic"
+            if any(k in g for k in ("jazz", "classical", "r&b", "soul", "blues", "folk", "singer", "indie")):
+                return "soul"
+    except Exception:
+        pass
+    return "pop"
+
 def cmd_lyrics(title: str, artist: str, duration: float, alt_index: int, cfg: dict):
     candidates = []
 
@@ -577,14 +607,16 @@ def cmd_lyrics(title: str, artist: str, duration: float, alt_index: int, cfg: di
     except Exception:
         pass
 
+    genre = detect_track_genre(title, artist)
     if not candidates:
-        print(json.dumps({"synced": False, "lines": [], "source": "", "total": 0}))
+        print(json.dumps({"synced": False, "lines": [], "source": "", "total": 0, "genre": genre}))
         return
 
     idx = alt_index % len(candidates)
     chosen = candidates[idx]
     chosen["total"] = len(candidates)
     chosen["index"] = idx
+    chosen["genre"] = genre
     print(json.dumps(chosen, ensure_ascii=False))
 
 

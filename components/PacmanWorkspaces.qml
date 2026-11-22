@@ -130,30 +130,13 @@ Item {
     width: implicitWidth
     height: implicitHeight
 
-    // Soft M3 Shadow
-    Rectangle {
-        id: pillShadow
-        anchors.fill: parent
-        radius: 18
-        color: "#000000"
-        visible: false
-    }
-
-    MultiEffect {
-        anchors.fill: pillShadow
-        source: pillShadow
-        shadowEnabled: true
-        shadowColor: Qt.rgba(0.0, 0.0, 0.0, 0.48)
-        shadowBlur: 0.72
-        shadowVerticalOffset: 4
-        autoPaddingEnabled: true
-    }
-
-    // Material You Pill Background
+    // Material You Pill Background (1-to-1 match with Dynamic Island & TopBar pills, no shadow darkening border!)
     Rectangle {
         anchors.fill: parent
         radius: 18
         color: MusicState.m3SurfaceContainer
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         // Wheel scroll to switch workspaces
         WheelHandler {

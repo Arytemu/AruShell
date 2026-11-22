@@ -364,19 +364,23 @@ WlSessionLock {
                                             ctx.clearRect(0, 0, width, height)
                                             var cx = width / 2, cy = height / 2, r = 24
                                             var c = MusicState.m3Primary
-                                            ctx.strokeStyle = "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + ",1)"
-                                            ctx.lineWidth = 7
-                                            ctx.lineCap = "round"
-                                            ctx.lineJoin = "round"
-                                            ctx.beginPath()
-                                            for (var i = 0; i < 5; i++) {
-                                                var a = (i * 60 + 30) * Math.PI / 180
-                                                var px = cx + r * Math.cos(a)
-                                                var py = cy + r * Math.sin(a)
-                                                if (i === 0) ctx.moveTo(px, py)
-                                                else ctx.lineTo(px, py)
-                                            }
-                                            ctx.stroke()
+                                            var mainCol = "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + ",1)"
+                                            var darkCol = "rgba(" + Math.round(c.r * 195) + "," + Math.round(c.g * 195) + "," + Math.round(c.b * 195) + ",0.92)"
+                                            var lightCol = "rgba(" + Math.min(255, Math.round(c.r * 255 + 45)) + "," + Math.min(255, Math.round(c.g * 255 + 45)) + "," + Math.min(255, Math.round(c.b * 255 + 45)) + ",1)"
+                                            var sc = width / 64.0
+                                            ctx.save(); ctx.scale(sc, sc)
+                                            ctx.fillStyle = lightCol
+                                            ctx.beginPath(); ctx.moveTo(20, 10); ctx.lineTo(44, 10); ctx.lineTo(39, 19); ctx.lineTo(25, 19); ctx.closePath(); ctx.fill()
+                                            ctx.fillStyle = mainCol
+                                            ctx.beginPath(); ctx.moveTo(20, 10); ctx.lineTo(25, 19); ctx.lineTo(16, 32); ctx.lineTo(7, 32); ctx.closePath(); ctx.fill()
+                                            ctx.fillStyle = darkCol
+                                            ctx.beginPath(); ctx.moveTo(7, 32); ctx.lineTo(16, 32); ctx.lineTo(25, 45); ctx.lineTo(20, 54); ctx.closePath(); ctx.fill()
+                                            ctx.fillStyle = mainCol
+                                            ctx.beginPath(); ctx.moveTo(20, 54); ctx.lineTo(25, 45); ctx.lineTo(44, 45); ctx.lineTo(49, 54); ctx.closePath(); ctx.fill()
+                                            ctx.fillStyle = lightCol; ctx.beginPath(); ctx.arc(51, 20, 4.2, 0, Math.PI * 2); ctx.fill()
+                                            ctx.fillStyle = mainCol; ctx.beginPath(); ctx.arc(56, 32, 3.2, 0, Math.PI * 2); ctx.fill()
+                                            ctx.fillStyle = darkCol; ctx.beginPath(); ctx.arc(46, 36, 5.2, 0, Math.PI * 2); ctx.fill()
+                                            ctx.restore()
                                         }
                                         Connections {
                                             target: MusicState
@@ -525,7 +529,7 @@ WlSessionLock {
                                         Layout.preferredWidth: 36; Layout.preferredHeight: 36; radius: 18
                                         color: prevMa.containsMouse ? MusicState.m3PrimaryContainer : Qt.rgba(1, 1, 1, 0.10)
                                         Behavior on color { ColorAnimation { duration: 150 } }
-                                        SysIcon { anchors.centerIn: parent; name: "chevron_left"; size: 16; color: MusicState.m3OnSurface }
+                                        SysIcon { anchors.centerIn: parent; name: "skip_prev"; size: 17; color: MusicState.m3OnSurface }
                                         MouseArea { id: prevMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { MusicState.prevTrack(); passHidden.forceActiveFocus() } }
                                     }
 
@@ -537,12 +541,11 @@ WlSessionLock {
                                         Behavior on Layout.preferredWidth { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
                                         Behavior on radius { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
-                                        Text {
+                                        SysIcon {
                                             anchors.centerIn: parent
-                                            text: MusicState.isPlaying ? "❚❚" : "▶"
+                                            name: MusicState.isPlaying ? "pause" : "play"
+                                            size: 19
                                             color: MusicState.m3OnPrimary
-                                            font.pixelSize: 14
-                                            font.weight: Font.Bold
                                         }
                                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { MusicState.togglePlay(); passHidden.forceActiveFocus() } }
                                     }
@@ -551,7 +554,7 @@ WlSessionLock {
                                         Layout.preferredWidth: 36; Layout.preferredHeight: 36; radius: 18
                                         color: nextMa.containsMouse ? MusicState.m3PrimaryContainer : Qt.rgba(1, 1, 1, 0.10)
                                         Behavior on color { ColorAnimation { duration: 150 } }
-                                        SysIcon { anchors.centerIn: parent; name: "chevron_right"; size: 16; color: MusicState.m3OnSurface }
+                                        SysIcon { anchors.centerIn: parent; name: "skip_next"; size: 17; color: MusicState.m3OnSurface }
                                         MouseArea { id: nextMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { MusicState.nextTrack(); passHidden.forceActiveFocus() } }
                                     }
                                 }
@@ -585,15 +588,28 @@ WlSessionLock {
 
                         Item { Layout.fillHeight: true }
 
-                        // Signature Caelestia Tall Condensed Clock (HHmm, Bebas Neue)
-                        Text {
+                        // Signature Caelestia Tall Condensed Clock (HHmm, Bebas Neue) with HUD-colored minutes
+                        Row {
                             Layout.alignment: Qt.AlignHCenter
-                            text: surface.hrStr + surface.minStr
-                            color: MusicState.m3OnSurface
-                            font.family: lockClockFont.status === FontLoader.Ready ? lockClockFont.name : MusicState.fontClock
-                            font.pixelSize: 138
-                            font.weight: Font.Normal
-                            font.letterSpacing: 2
+                            spacing: 2
+
+                            Text {
+                                text: surface.hrStr
+                                color: MusicState.m3OnSurface
+                                font.family: lockClockFont.status === FontLoader.Ready ? lockClockFont.name : MusicState.fontClock
+                                font.pixelSize: 138
+                                font.weight: Font.Normal
+                                font.letterSpacing: 2
+                            }
+
+                            Text {
+                                text: surface.minStr
+                                color: MusicState.m3Primary
+                                font.family: lockClockFont.status === FontLoader.Ready ? lockClockFont.name : MusicState.fontClock
+                                font.pixelSize: 138
+                                font.weight: Font.Normal
+                                font.letterSpacing: 2
+                            }
                         }
 
                         // Uppercase Date Subtitle
@@ -635,19 +651,48 @@ WlSessionLock {
                                 font.weight: Font.Black
                             }
 
-                            ClippingRectangle {
+                            Canvas {
+                                id: lockCookieMask
                                 anchors.fill: parent
-                                radius: width / 2
-                                visible: faceImg.status === Image.Ready
-                                color: "transparent"
-
-                                Image {
-                                    id: faceImg
-                                    anchors.fill: parent
-                                    source: surface.homeDir !== "" ? ("file://" + surface.homeDir + "/.face") : ""
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
+                                layer.enabled: true
+                                visible: false
+                                onPaint: {
+                                    var ctx = getContext("2d")
+                                    ctx.clearRect(0, 0, width, height)
+                                    var cx = width / 2, cy = height / 2
+                                    var baseR = Math.min(width, height) * 0.445
+                                    var amp = baseR * 0.088
+                                    ctx.beginPath()
+                                    for (var i = 0; i <= 160; i++) {
+                                        var a = (i / 160) * Math.PI * 2
+                                        var r = baseR + amp * Math.cos(8 * a)
+                                        var px = cx + r * Math.cos(a)
+                                        var py = cy + r * Math.sin(a)
+                                        if (i === 0) ctx.moveTo(px, py)
+                                        else ctx.lineTo(px, py)
+                                    }
+                                    ctx.closePath()
+                                    ctx.fillStyle = "#ffffff"
+                                    ctx.fill()
                                 }
+                            }
+
+                            Image {
+                                id: faceImg
+                                anchors.fill: parent
+                                source: surface.homeDir !== "" ? ("file://" + surface.homeDir + "/.face") : ""
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                visible: false
+                                onStatusChanged: lockCookieMask.requestPaint()
+                            }
+
+                            MultiEffect {
+                                anchors.fill: parent
+                                source: faceImg
+                                visible: faceImg.status === Image.Ready
+                                maskEnabled: true
+                                maskSource: lockCookieMask
                             }
                         }
 

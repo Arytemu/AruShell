@@ -25,8 +25,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 26
+        radius: MusicState.shapeXl
         color: MusicState.m3SurfaceContainer
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         // Absorb clicks on panel background so they don't fall through to TopBar backdrop dismiss
         MouseArea {
@@ -58,14 +60,14 @@ Item {
                     Layout.preferredWidth: dndLabel.implicitWidth + 18
                     Layout.alignment: Qt.AlignVCenter
                     radius: 14
-                    color: NotifState.dndEnabled ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHigh
+                    color: NotifState.dndEnabled ? MusicState.m3TertiaryContainer : MusicState.m3SurfaceContainerHigh
                     Behavior on color { ColorAnimation { duration: 160 } }
 
                     Text {
                         id: dndLabel
                         anchors.centerIn: parent
                         text: NotifState.dndEnabled ? "DND вкл" : "DND"
-                        color: NotifState.dndEnabled ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurfaceVariant
+                        color: NotifState.dndEnabled ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurfaceVariant
                         font.family: MusicState.fontUi
                         font.pixelSize: 11
                         font.weight: Font.SemiBold
@@ -84,13 +86,14 @@ Item {
                     Layout.preferredWidth: clearLabel.implicitWidth + 18
                     Layout.alignment: Qt.AlignVCenter
                     radius: 14
-                    color: clearMa.containsMouse ? MusicState.m3SurfaceContainerHighest : MusicState.m3SurfaceContainerHigh
+                    color: clearMa.containsMouse ? MusicState.m3ErrorContainer : MusicState.m3SurfaceContainerHigh
+                    Behavior on color { ColorAnimation { duration: 160 } }
 
                     Text {
                         id: clearLabel
                         anchors.centerIn: parent
                         text: "Очистить"
-                        color: MusicState.m3OnSurface
+                        color: clearMa.containsMouse ? MusicState.m3OnErrorContainer : MusicState.m3OnSurface
                         font.family: MusicState.fontUi
                         font.pixelSize: 11
                         font.weight: Font.SemiBold
@@ -118,7 +121,7 @@ Item {
                     id: notifCard
                     readonly property int cardIndex: index
                     readonly property var cardData: modelData
-                    width: notifList.width
+                    width: Math.max(0, notifList.width || 0)
                     height: cardCol.implicitHeight + 20
                     radius: 18
                     color: cardMa.containsMouse ? MusicState.m3SurfaceContainerHighest : MusicState.m3SurfaceContainerHigh

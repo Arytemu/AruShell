@@ -26,7 +26,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 24
-        color: MusicState.m3SurfaceContainer
+        color: MusicState.m3SurfaceContainerHigh
+        border.width: 1
+        border.color: MusicState.m3OutlineVariant
 
         RowLayout {
             anchors.fill: parent
@@ -37,7 +39,7 @@ Item {
             SysIcon {
                 name: SystemState.osdIcon
                 size: 18
-                color: MusicState.m3Primary
+                color: SystemState.osdShowBar ? MusicState.m3Primary : MusicState.m3Tertiary
                 Layout.alignment: Qt.AlignVCenter
             }
 
