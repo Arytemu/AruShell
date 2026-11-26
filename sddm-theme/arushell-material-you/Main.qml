@@ -289,7 +289,7 @@ Rectangle {
                                     ctx.fill()
                                 }
                                 NumberAnimation on rotation {
-                                    from: 0; to: 360; duration: 24000; loops: Animation.Infinite; running: true
+                                    from: 0; to: 360; duration: 24000; loops: Animation.Infinite; running: visible
                                 }
                             }
 

@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Ensure valid HYPRLAND_INSTANCE_SIGNATURE even when launched via systemd user service
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || [ ! -S "/run/user/$(id -u)/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/.socket.sock" ]; then
+    _LIVE_SIG="$(ls -t "/run/user/$(id -u)/hypr" 2>/dev/null | head -n 1 || true)"
+    [ -n "${_LIVE_SIG}" ] && export HYPRLAND_INSTANCE_SIGNATURE="${_LIVE_SIG}"
+fi
 
 CMD="${1:-}"
 SHOT_DIR="${XDG_PICTURES_DIR:-${HOME}/Pictures}/Screenshots"

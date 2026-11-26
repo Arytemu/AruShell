@@ -40,8 +40,12 @@ ShellRoot {
         source: "components/GlobeSearchOverlay.qml"
     }
 
-    // Caelestia-style Native Wayland Lock Screen (SUPER + L & 10-min hypridle)
-    LockScreen {}
+    // Caelestia-style Native Wayland Lock Screen (lazy-loaded: 0 VRAM/GPU cost when unlocked)
+    Loader {
+        id: lockLoader
+        active: LockState.locked || LockState.unlocking
+        source: "components/LockScreen.qml"
+    }
 
     // Global IPC for Hyprland keybinds:
     //   quickshell ipc -c AruShell call screenshot open
@@ -113,6 +117,10 @@ ShellRoot {
                 monitorScreen: modelData
                 anchors.fill: parent
                 z: 0
+            }
+
+            AudioVisualizer {
+                z: 4
             }
 
             MouseArea {
@@ -354,13 +362,13 @@ ShellRoot {
             }
 
             // Constant height: zero Wayland surface reallocations during animations!
-            implicitHeight: 560
+            implicitHeight: 740
             exclusiveZone: 48
             exclusionMode: ExclusionMode.Normal
 
             WlrLayershell.layer: WlrLayer.Top
             WlrLayershell.namespace: "arushell-topbar"
-            WlrLayershell.keyboardFocus: (SystemState.launcherOpen || ClipboardState.open || SystemState.wifiPasswordTarget !== "") ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+            WlrLayershell.keyboardFocus: (topBarWin.anyTopPopupOpen || SystemState.wifiPasswordTarget !== "") ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
             color: "transparent"
 
             // Input mask: only captures clicks in top 48px strip + exact Dynamic Island / Toast rect (never blocks sides!)
@@ -392,6 +400,17 @@ ShellRoot {
                 }
                 width: (NotifState.islandExpanded || NotifState.activeToast !== null) ? topBarItem.islandHitWidth : 0
                 height: (NotifState.islandExpanded || NotifState.activeToast !== null) ? topBarItem.islandHitHeight : 0
+            }
+
+            Item {
+                id: topPopupEscCatcher
+                focus: (SystemState.quickSettingsOpen || NotifState.centerOpen || SystemState.langMenuOpen) && SystemState.wifiPasswordTarget === ""
+                Keys.onEscapePressed: {
+                    SystemState.quickSettingsOpen = false
+                    SystemState.quickSettingsSubmenu = ""
+                    NotifState.centerOpen = false
+                    SystemState.langMenuOpen = false
+                }
             }
 
             TopBar {
@@ -537,6 +556,7 @@ ShellRoot {
             implicitHeight: 160
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
+            visible: ShellConfig.osdEnabled && SystemState.osdVisible
             WlrLayershell.namespace: "arushell-osd"
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
             color: "transparent"

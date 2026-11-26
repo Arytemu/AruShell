@@ -83,6 +83,7 @@ Column {
 
                     Image {
                         id: coverImg
+                    sourceSize: Qt.size(512, 512)
                         anchors.fill: parent
                         source: MusicState.artUrl
                         fillMode: Image.PreserveAspectCrop

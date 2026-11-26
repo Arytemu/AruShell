@@ -22,9 +22,9 @@ Item {
     y: SystemState.launcherOpen ? 0 : -12
     transformOrigin: Item.TopLeft
 
-    Behavior on opacity { M3Anim { duration: 240 } }
-    Behavior on scale   { M3Anim { duration: 340 } }
-    Behavior on y       { M3Anim { duration: 340 } }
+    Behavior on opacity { M3Anim { duration: SystemState.launcherOpen ? 240 : 150 } }
+    Behavior on scale   { M3Anim { duration: SystemState.launcherOpen ? 320 : 180 } }
+    Behavior on y       { M3Anim { duration: SystemState.launcherOpen ? 320 : 180 } }
 
     property string query: ""
     property int activeTab: 0 // 0: Приложения, 1: Окна, 2: Эмодзи
@@ -484,7 +484,7 @@ Item {
                                 text: "Недавнее"
                                 color: isSel ? MusicState.m3OnPrimary : MusicState.m3OnSecondaryContainer
                                 font.family: MusicState.fontUi
-                                font.pixelSize: 9
+                                font.pixelSize: 10
                                 font.weight: Font.Bold
                             }
                         }

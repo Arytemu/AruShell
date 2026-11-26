@@ -16,9 +16,9 @@ Item {
     y: ClipboardState.open ? 0 : -12
     transformOrigin: Item.Top
 
-    Behavior on opacity { M3Anim { duration: 240 } }
-    Behavior on scale   { M3Anim { duration: 340 } }
-    Behavior on y       { M3Anim { duration: 340 } }
+    Behavior on opacity { M3Anim { duration: ClipboardState.open ? 240 : 150 } }
+    Behavior on scale   { M3Anim { duration: ClipboardState.open ? 320 : 180 } }
+    Behavior on y       { M3Anim { duration: ClipboardState.open ? 320 : 180 } }
 
     property string query: ""
 
@@ -162,7 +162,7 @@ Item {
                 delegate: Rectangle {
                     required property var modelData
                     width: clipList.width
-                    height: Math.max(46, clipTxt.implicitHeight + 18)
+                    height: (modelData.isImage && modelData.thumbPath) ? 74 : Math.max(46, clipTxt.implicitHeight + 18)
                     radius: 16
                     color: cRowMa.containsMouse ? MusicState.m3SurfaceContainerHighest : MusicState.m3SurfaceContainerHigh
                     Behavior on color { ColorAnimation { duration: 140 } }
@@ -172,7 +172,10 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: ClipboardState.copyItem(modelData.id)
+                        onClicked: {
+                            ClipboardState.copyItem(modelData.id)
+                            SystemState.showOsd("clipboard", "Буфер обмена", 1.0, "Скопировано", false)
+                        }
                     }
 
                     RowLayout {
@@ -180,6 +183,25 @@ Item {
                         anchors.leftMargin: 12
                         anchors.rightMargin: 10
                         spacing: 10
+
+                        Rectangle {
+                            visible: !!(modelData.isImage && modelData.thumbPath)
+                            Layout.preferredWidth: 84
+                            Layout.preferredHeight: 54
+                            Layout.alignment: Qt.AlignVCenter
+                            radius: 10
+                            color: MusicState.m3SurfaceContainer
+                            clip: true
+
+                            Image {
+                                anchors.fill: parent
+                                source: (modelData.isImage && modelData.thumbPath) ? ("file://" + modelData.thumbPath) : ""
+                                sourceSize: Qt.size(168, 108)
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                smooth: true
+                            }
+                        }
 
                         Text {
                             id: clipTxt
@@ -205,7 +227,7 @@ Item {
                                 anchors.centerIn: parent
                                 name: "trash"
                                 size: 13
-                                color: delMa.containsMouse ? "#F2B8B5" : MusicState.m3OnSurfaceVariant
+                                color: delMa.containsMouse ? MusicState.m3Error : MusicState.m3OnSurfaceVariant
                             }
 
                             MouseArea {

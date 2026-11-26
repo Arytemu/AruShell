@@ -183,7 +183,7 @@ rm -rf "${TARGET_DIR}/shaders" \
        "${TARGET_DIR}/components/GlassSurface.qml"
 
 cp -r "${SCRIPT_DIR}/." "${TARGET_DIR}/"
-chmod +x "${TARGET_DIR}/services/backend.py" \
+chmod +x "${TARGET_DIR}/services/backend.py" "${TARGET_DIR}/services/extract_color.py" "${TARGET_DIR}/services/kitty_autofont.py" "${TARGET_DIR}/services/websearch.py" "${TARGET_DIR}/services/clip_preview.py" "${TARGET_DIR}/services/theme_sync.py" "${TARGET_DIR}/services/hypr_anims.py" "${TARGET_DIR}/services/audio_mixer.py" "${TARGET_DIR}/services/smart_lock.sh" "${TARGET_DIR}/services/sysinfo.sh" "${TARGET_DIR}/services/screenshot.sh"
          "${TARGET_DIR}/services/extract_color.py" \
          "${TARGET_DIR}/services/sysinfo.sh" \
          "${TARGET_DIR}/services/screenshot.sh" \

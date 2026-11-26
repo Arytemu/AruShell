@@ -42,6 +42,7 @@ Singleton {
     property int volume: 50
     property bool muted: false
     property var audioSinks: []
+    property var appStreams: []
 
     // Brightness
     property bool hasBrightness: false
@@ -67,11 +68,13 @@ Singleton {
     property string netUp: "0 KB/s"
     property bool gameMode: false
     property bool keepAwake: false
+    property bool hasCava: true
 
     // Daily-driver extras
     property string kbdLayout: "EN"
     property bool nightLight: false
     property string powerProfile: ""
+    property var powerProfiles: []
 
     // Weather
     property string weatherTemp: ""
@@ -94,6 +97,37 @@ Singleton {
     property bool _firstPollDone: false
 
     readonly property string sysScript: Qt.resolvedUrl("sysinfo.sh").toString().replace("file://", "")
+    readonly property string hyprAnimsScript: Qt.resolvedUrl("hypr_anims.py").toString().replace("file://", "")
+    readonly property string audioMixerScript: Qt.resolvedUrl("audio_mixer.py").toString().replace("file://", "")
+
+    function refreshAppStreams() {
+        if (appStreamProc.running) return
+        appStreamProc.command = ["python3", root.audioMixerScript, "list"]
+        appStreamProc.running = true
+    }
+
+    function setAppVolume(streamId, pct) {
+        Quickshell.execDetached(["python3", root.audioMixerScript, "set", String(streamId), String(Math.round(pct))])
+    }
+
+    function toggleAppMute(streamId) {
+        Quickshell.execDetached(["python3", root.audioMixerScript, "mute", String(streamId)])
+        appStreamRefreshDelay.restart()
+    }
+
+    function applyHyprAnims() {
+        ShellConfig.save()
+        Quickshell.execDetached([
+            "python3", root.hyprAnimsScript,
+            ShellConfig.hyprAnimStyle,
+            ShellConfig.hyprAnimWinStyle,
+            ShellConfig.hyprAnimWsStyle,
+            String(ShellConfig.hyprAnimSpeed)
+        ])
+        const labels = { smooth: "Плавные M3", snappy: "Быстрые", bounce: "Пружина", minimal: "Минимум", off: "Выкл" }
+        showOsd("sliders", "Анимации", 1.0, labels[ShellConfig.hyprAnimStyle] || ShellConfig.hyprAnimStyle, false)
+    }
+
 
     function showOsd(icon, label, valueRatio, textVal, showBar) {
         osdIcon = icon
@@ -210,7 +244,7 @@ Singleton {
         quickSettingsSubmenu = name
         if (name === "wifi") refreshWifiList()
         else if (name === "bt") refreshBtList()
-        else if (name === "audio") refreshAudioSinks()
+        else if (name === "audio") { refreshAudioSinks(); refreshAppStreams() }
     }
 
     function runCmd(cmd) {
@@ -292,12 +326,32 @@ Singleton {
         runCmd("brightnessctl set " + clamped + "%")
     }
 
+    function _hyprExec(luaCode, legacyBatch) {
+        const script =
+            'SIG="${HYPRLAND_INSTANCE_SIGNATURE:-}"; ' +
+            'if [ -z "$SIG" ] || [ ! -S "/run/user/$(id -u)/hypr/$SIG/.socket.sock" ]; then ' +
+            'SIG="$(ls -t "/run/user/$(id -u)/hypr" 2>/dev/null | head -n 1)"; fi; ' +
+            'export HYPRLAND_INSTANCE_SIGNATURE="$SIG"; ' +
+            'if command -v hyprctl >/dev/null 2>&1 && [ -n "$SIG" ]; then ' +
+            'hyprctl eval "$1" >/dev/null 2>&1 || hyprctl --batch "$2" >/dev/null 2>&1; fi'
+        Quickshell.execDetached(["bash", "-c", script, "_", luaCode, legacyBatch || ""])
+    }
+
     function toggleNightLight() {
-        nightLight = !nightLight
-        if (nightLight) {
-            Quickshell.execDetached(["bash", "-c", "pkill -x hyprsunset 2>/dev/null || true; hyprsunset -t 4200 >/dev/null 2>&1 &"])
+        if (!nightLight) {
+            nightLight = true
+            Quickshell.execDetached(["bash", "-c",
+                "pkill -x hyprsunset 2>/dev/null || true; pkill -x wlsunset 2>/dev/null || true; pkill -x gammastep 2>/dev/null || true; " +
+                "if command -v hyprsunset >/dev/null 2>&1; then setsid -f hyprsunset -t 4200 >/dev/null 2>&1; " +
+                "elif command -v wlsunset >/dev/null 2>&1; then setsid -f wlsunset -T 4200 -t 4200 >/dev/null 2>&1; " +
+                "elif command -v gammastep >/dev/null 2>&1; then setsid -f gammastep -O 4200 >/dev/null 2>&1; " +
+                "else exit 1; fi"
+            ])
+            showOsd("nightlight", "Ночной свет", 1.0, "4200K", false)
         } else {
-            Quickshell.execDetached(["bash", "-c", "pkill -x hyprsunset 2>/dev/null || true"])
+            nightLight = false
+            Quickshell.execDetached(["bash", "-c", "pkill -x hyprsunset 2>/dev/null || true; pkill -x wlsunset 2>/dev/null || true; pkill -x gammastep 2>/dev/null || true"])
+            showOsd("nightlight", "Ночной свет", 0.0, "Выкл", false)
         }
         delayedRefresh.restart()
     }
@@ -305,10 +359,19 @@ Singleton {
     function toggleGameMode() {
         gameMode = !gameMode
         if (gameMode) {
-            Quickshell.execDetached(["bash", "-c", "hyprctl --batch 'keyword animations:enabled 0; keyword decoration:blur:enabled 0; keyword decoration:shadow:enabled 0' >/dev/null 2>&1"])
+            _hyprExec(
+                "hl.config({ animations = { enabled = false }, decoration = { blur = { enabled = false }, shadow = { enabled = false }, rounding = 0 }, general = { gaps_in = 0, gaps_out = 0 } })",
+                "keyword animations:enabled 0; keyword decoration:blur:enabled 0; keyword decoration:shadow:enabled 0; keyword decoration:rounding 0; keyword general:gaps_in 0; keyword general:gaps_out 0"
+            )
             showOsd("apps", "Игровой режим", 1.0, "Вкл", false)
         } else {
-            Quickshell.execDetached(["bash", "-c", "hyprctl reload >/dev/null 2>&1"])
+            const reloadScript =
+                'SIG="${HYPRLAND_INSTANCE_SIGNATURE:-}"; ' +
+                'if [ -z "$SIG" ] || [ ! -S "/run/user/$(id -u)/hypr/$SIG/.socket.sock" ]; then ' +
+                'SIG="$(ls -t "/run/user/$(id -u)/hypr" 2>/dev/null | head -n 1)"; fi; ' +
+                'export HYPRLAND_INSTANCE_SIGNATURE="$SIG"; ' +
+                'hyprctl reload >/dev/null 2>&1'
+            Quickshell.execDetached(["bash", "-c", reloadScript])
             showOsd("apps", "Игровой режим", 0.0, "Выкл", false)
         }
     }
@@ -325,12 +388,18 @@ Singleton {
     }
 
     function cyclePowerProfile() {
-        if (!powerProfile) return
-        const order = ["power-saver", "balanced", "performance"]
-        const idx = order.indexOf(powerProfile)
-        const next = order[(idx + 1) % order.length]
-        powerProfile = next
-        runCmd("powerprofilesctl set " + next)
+        if (!powerProfile) {
+            showOsd("performance", "Питание", 0.0, "Нужен power-profiles-daemon", false)
+            return
+        }
+        const avail = (powerProfiles && powerProfiles.length > 0) ? powerProfiles : ["power-saver", "balanced", "performance"]
+        const idx = avail.indexOf(powerProfile)
+        const next = avail[(idx + 1) % avail.length]
+        if (powerSetProc.running) return
+        powerSetProc.targetProfile = next
+        powerSetProc.errBuf = ""
+        powerSetProc.command = ["powerprofilesctl", "set", next]
+        powerSetProc.running = true
     }
 
     function switchKeyboardLayout() {
@@ -416,8 +485,9 @@ Singleton {
         }
     }
 
+
     Timer {
-        interval: 2500
+        interval: (root.quickSettingsOpen || NotifState.islandExpanded) ? 2000 : 5000
         running: true
         repeat: true
         triggeredOnStart: true
@@ -430,6 +500,48 @@ Singleton {
         repeat: true
         triggeredOnStart: true
         onTriggered: root.refreshWeather()
+    }
+
+    Timer {
+        id: appStreamRefreshDelay
+        interval: 220
+        repeat: false
+        onTriggered: root.refreshAppStreams()
+    }
+
+    Process {
+        id: appStreamProc
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                const s = line.trim()
+                if (!s.startsWith("[")) return
+                try { root.appStreams = JSON.parse(s) } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: powerSetProc
+        property string targetProfile: ""
+        property string errBuf: ""
+        stderr: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) { powerSetProc.errBuf += line + " " }
+        }
+        onExited: function(code) {
+            const labels = { "power-saver": "Экономия", "balanced": "Баланс", "performance": "Максимум" }
+            if (code === 0) {
+                root.powerProfile = targetProfile
+                root.showOsd("performance", "Питание", 1.0, labels[targetProfile] || targetProfile, false)
+            } else {
+                // Profile rejected by kernel/daemon (e.g. degraded/unsupported) — remove from cycle & notify honestly
+                const filtered = (root.powerProfiles || []).filter(function(x) { return x !== targetProfile })
+                if (filtered.length > 0) root.powerProfiles = filtered
+                root.showOsd("performance", "Питание", 0.0, (labels[targetProfile] || targetProfile) + " недоступен", false)
+            }
+            delayedRefresh.restart()
+        }
     }
 
     Process {
@@ -467,6 +579,8 @@ Singleton {
                     root.userName = d.userName || "user"
                     root.nightLight = !!d.nightLight
                     root.powerProfile = d.powerProfile || ""
+                    if (Array.isArray(d.powerProfiles)) root.powerProfiles = d.powerProfiles
+                    if (d.hasCava !== undefined) root.hasCava = !!d.hasCava
                     root.kbdLayout = d.kbdLayout || "EN"
                     if (d.hostName) root.hostName = d.hostName
                     if (d.kernelVer) root.kernelVer = d.kernelVer

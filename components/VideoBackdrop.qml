@@ -61,7 +61,8 @@ Item {
             id: fluidArtLayer
             anchors.fill: parent
             opacity: (!MusicState.stageMinimizedToIsland && MusicState.hasTrack && MusicState.artUrl !== "") ? 1.0 : (root.hasCustomWall ? 0.0 : 1.0)
-            visible: opacity > 0.01
+            readonly property bool _coveredByVideo: !!(videoLoader.item && videoLoader.item.videoReady && MusicState.isPlaying && !MusicState.stageMinimizedToIsland)
+            visible: opacity > 0.01 && !_coveredByVideo
             Behavior on opacity { NumberAnimation { duration: 480; easing.type: Easing.InOutCubic } }
 
             Image {
@@ -81,7 +82,7 @@ Item {
             }
 
             SequentialAnimation {
-                running: MusicState.artUrl !== "" && MusicState.isPlaying && root.desktopIsEmpty
+                running: fluidArtLayer.visible && MusicState.artUrl !== "" && MusicState.isPlaying && root.desktopIsEmpty
                 loops: Animation.Infinite
                 ParallelAnimation {
                     NumberAnimation { target: bgArt; property: "scale"; from: 1.0; to: 1.12; duration: 14000; easing.type: Easing.InOutSine }
@@ -153,7 +154,7 @@ Item {
         visible: blur > 0.005
         blurEnabled: true
         blur: root._shouldBlurBg ? 0.80 : 0.0
-        blurMax: 52
+        blurMax: 32
         brightness: root._shouldBlurBg ? -0.10 : 0.0
         autoPaddingEnabled: false
         Behavior on blur { NumberAnimation { duration: 340; easing.type: Easing.InOutCubic } }

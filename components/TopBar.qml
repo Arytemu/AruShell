@@ -80,6 +80,7 @@ Item {
                 Image {
                     anchors.fill: parent
                     source: ShellConfig.launcherImagePath !== "" ? ("file://" + ShellConfig.launcherImagePath) : ""
+                    sourceSize: Qt.size(96, 96)
                     fillMode: Image.PreserveAspectCrop
                     smooth: true
                     asynchronous: true

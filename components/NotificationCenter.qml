@@ -19,9 +19,9 @@ Item {
     y: NotifState.centerOpen ? 0 : -10
     transformOrigin: Item.TopRight
 
-    Behavior on opacity { M3Anim { duration: 280 } }
-    Behavior on scale   { M3Anim { duration: 380 } }
-    Behavior on y       { M3Anim { duration: 380 } }
+    Behavior on opacity { M3Anim { duration: NotifState.centerOpen ? 260 : 160 } }
+    Behavior on scale   { M3Anim { duration: NotifState.centerOpen ? 340 : 180 } }
+    Behavior on y       { M3Anim { duration: NotifState.centerOpen ? 340 : 180 } }
 
     Rectangle {
         anchors.fill: parent
@@ -182,6 +182,49 @@ Item {
                                     font.pixelSize: 11
                                     font.weight: Font.SemiBold
                                     elide: Text.ElideRight
+                                }
+
+                                Rectangle {
+                                    readonly property bool appMuted: NotifState.isAppMuted(modelData.appName)
+                                    Layout.preferredHeight: 22
+                                    Layout.preferredWidth: mute1Txt.implicitWidth + 12
+                                    radius: 11
+                                    z: 5
+                                    color: appMuted ? MusicState.m3TertiaryContainer : MusicState.m3SurfaceContainer
+                                    Text {
+                                        id: mute1Txt
+                                        anchors.centerIn: parent
+                                        text: parent.appMuted ? "Мут ×" : "1ч"
+                                        color: parent.appMuted ? MusicState.m3OnTertiaryContainer : MusicState.m3OnSurfaceVariant
+                                        font.family: MusicState.fontUi; font.pixelSize: 10; font.weight: Font.Bold
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            if (NotifState.isAppMuted(modelData.appName)) NotifState.unmuteApp(modelData.appName)
+                                            else NotifState.muteApp(modelData.appName, 1)
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    visible: !NotifState.isAppMuted(modelData.appName)
+                                    Layout.preferredHeight: 22
+                                    Layout.preferredWidth: mute4Txt.implicitWidth + 12
+                                    radius: 11
+                                    z: 5
+                                    color: MusicState.m3SurfaceContainer
+                                    Text {
+                                        id: mute4Txt
+                                        anchors.centerIn: parent
+                                        text: "4ч"
+                                        color: MusicState.m3OnSurfaceVariant
+                                        font.family: MusicState.fontUi; font.pixelSize: 10; font.weight: Font.Bold
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                        onClicked: NotifState.muteApp(modelData.appName, 4)
+                                    }
                                 }
 
                                 Text {

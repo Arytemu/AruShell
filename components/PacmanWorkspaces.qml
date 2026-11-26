@@ -139,15 +139,6 @@ Item {
         border.color: MusicState.m3OutlineVariant
 
         // Wheel scroll to switch workspaces
-        WheelHandler {
-            onWheel: function(event) {
-                if (event.angleDelta.y > 0) {
-                    root.switchWorkspace("e-1")
-                } else if (event.angleDelta.y < 0) {
-                    root.switchWorkspace("e+1")
-                }
-            }
-        }
 
         // Workspace pellets (dots)
         Row {
@@ -177,19 +168,19 @@ Item {
                         width: 18
                         height: 18
                         radius: 9
-                        color: "#FF3B4E"
+                        color: MusicState.m3Error
                         visible: urgent && !eaten
                         opacity: 0.32
                         scale: 1.0
 
                         SequentialAnimation {
-                            running: urgent && !eaten
+                            running: root.visible && urgent && !eaten
                             loops: Animation.Infinite
                             ParallelAnimation {
                                 NumberAnimation { target: urgentGlow; property: "scale"; from: 0.9; to: 1.45; duration: 750; easing.type: Easing.OutCubic }
                                 NumberAnimation { target: urgentGlow; property: "opacity"; from: 0.48; to: 0.06; duration: 750; easing.type: Easing.OutCubic }
                             }
-                            NumberAnimation { target: urgentGlow; property: "scale"; to: 0.9; duration: 1 }
+                            PropertyAction { target: urgentGlow; property: "scale"; value: 0.9 }
                         }
                     }
 
@@ -198,7 +189,7 @@ Item {
                         width: urgent ? 11 : (occupied ? 10 : 6)
                         height: width
                         radius: width / 2
-                        color: urgent ? "#FF3B4E" : MusicState.m3OnSurface
+                        color: urgent ? MusicState.m3Error : MusicState.m3OnSurface
                         opacity: eaten ? 0.0 : (urgent ? 1.0 : (occupied ? 0.88 : (dotMa.containsMouse ? 0.55 : 0.28)))
                         scale: eaten ? 0.1 : (dotMa.containsMouse ? 1.25 : 1.0)
 

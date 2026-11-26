@@ -16,12 +16,13 @@ Item {
     visible: ShellConfig.osdEnabled && opacity > 0.01
     opacity: SystemState.osdVisible ? 1.0 : 0.0
     scale: SystemState.osdVisible ? 1.0 : 0.90
-    y: SystemState.osdVisible ? 0 : 12
+    property real slideOffset: SystemState.osdVisible ? 0 : 14
+    transform: Translate { y: root.slideOffset }
 
-    Behavior on opacity { M3Anim { duration: 220 } }
-    Behavior on scale   { M3Anim { duration: 300 } }
-    Behavior on y       { M3Anim { duration: 300 } }
-    Behavior on width   { M3Anim { duration: 240 } }
+    Behavior on opacity     { M3Anim { duration: SystemState.osdVisible ? 220 : 150 } }
+    Behavior on scale       { M3Anim { duration: SystemState.osdVisible ? 280 : 170 } }
+    Behavior on slideOffset { M3Anim { duration: SystemState.osdVisible ? 280 : 170 } }
+    Behavior on width       { M3Anim { duration: 240 } }
 
     Rectangle {
         anchors.fill: parent

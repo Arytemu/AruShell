@@ -458,7 +458,7 @@ PanelWindow {
                     text: Math.round(shotWin.pointerX * ScreenshotState.monitorScale) + "," + Math.round(shotWin.pointerY * ScreenshotState.monitorScale)
                     color: "#FFFFFF"
                     font.family: MusicState.fontUi
-                    font.pixelSize: 9
+                    font.pixelSize: 10
                     font.weight: Font.Bold
                 }
             }

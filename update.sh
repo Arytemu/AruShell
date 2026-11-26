@@ -23,6 +23,11 @@ chmod +x "${TARGET_DIR}/services/backend.py" \
          "${TARGET_DIR}/services/extract_color.py" \
          "${TARGET_DIR}/services/websearch.py" \
          "${TARGET_DIR}/services/kitty_autofont.py" \
+         "${TARGET_DIR}/services/clip_preview.py" \
+         "${TARGET_DIR}/services/theme_sync.py" \
+         "${TARGET_DIR}/services/hypr_anims.py" \
+         "${TARGET_DIR}/services/smart_lock.sh" \
+         "${TARGET_DIR}/services/audio_mixer.py" \
          "${TARGET_DIR}/services/sysinfo.sh" \
          "${TARGET_DIR}/services/screenshot.sh"
 
@@ -169,11 +174,12 @@ if os.path.isfile(lua_main):
         'pcall(function() hl.unbind("SUPER + B") end)\n'
         'pcall(function() hl.unbind("SUPER + b") end)\n'
         'hl.bind("SUPER + B", hl.dsp.exec_cmd("quickshell ipc -c AruShell call globe toggle"))\n'
-        'hl.config({ decoration = { active_opacity = 1.0, inactive_opacity = 0.94, fullscreen_opacity = 1.0, blur = { enabled = true, size = 7, passes = 3, vibrancy = 0.22, ignore_opacity = true, new_optimizations = true } } })\n'
+        'hl.config({ general = { border_size = 2 }, decoration = { active_opacity = 1.0, inactive_opacity = 0.94, fullscreen_opacity = 1.0, blur = { enabled = true, size = 7, passes = 3, vibrancy = 0.22, ignore_opacity = true, new_optimizations = true } } })\n'
         'hl.window_rule({ name = "arushell-kitty-glass", match = { class = "kitty" }, opacity = "1.0 override 0.94 override" })\n'
         'hl.window_rule({ name = "arushell-games-opaque", match = { class = "^(steam_app_.*|gamescope|mpv|vlc|firefox|zen)$" }, opacity = "1.0 override 1.0 override" })\n'
         'hl.exec_cmd("pgrep -f cliphist >/dev/null || wl-paste --watch cliphist store")\n'
         'hl.exec_cmd("pgrep -x hypridle >/dev/null || hypridle")\n'
+        'pcall(dofile, os.getenv("HOME") .. "/.config/hypr/arushell_anims.lua")\n'
         "-- end AruShell lock & wallpaper binds\n"
     )
     orig_lua = open(lua_main, encoding="utf-8").read()
@@ -184,7 +190,7 @@ if os.path.isfile(lua_main):
         print("  [OK] Бинды SUPER+W, SUPER+L, SUPER+B и автозапуск обновлены в hyprland.lua")
 PYEOF
 
-    cat > "${HYPR_DIR}/hypridle.conf" <<'IDLEEOF'
+    cat > "${HYPR_DIR}/hypridle.conf" <<IDLEEOF
 general {
     lock_cmd = quickshell ipc -c AruShell call lock lock
     before_sleep_cmd = quickshell ipc -c AruShell call lock lock
@@ -193,10 +199,21 @@ general {
 
 listener {
     timeout = 600
-    on-timeout = quickshell ipc -c AruShell call lock lock
+    on-timeout = ${HOME}/.config/quickshell/AruShell/services/smart_lock.sh
 }
 IDLEEOF
     echo "  [OK] Настроен автолок через 10 минут бездействия (${HYPR_DIR}/hypridle.conf)"
+
+    # Clean up any previous Liquid Glass / HyprGlass experiment files and restore normal Hyprland/Kitty state
+    rm -f "${HYPR_DIR}/arushell_glass.lua" "${HOME}/.cache/arushell/liquid_glass_state.json" /tmp/arushell_glass.log 2>/dev/null || true
+    if command -v hyprpm >/dev/null 2>&1; then
+        hyprpm disable hyprglass >/dev/null 2>&1 || true
+    fi
+    hyprctl eval 'if hl.plugin and hl.plugin.hyprglass then hl.plugin.hyprglass.config({ enabled = false, layers = { enabled = false } }) end' >/dev/null 2>&1 || true
+    if [ -f "${HOME}/.config/kitty/kitty.conf" ]; then
+        sed -i 's/^background_opacity[[:space:]]\+0\.\(26\|28\|30\|32\|42\|58\)/background_opacity       0.80/' "${HOME}/.config/kitty/kitty.conf" 2>/dev/null || true
+        pkill -USR1 kitty 2>/dev/null || true
+    fi
 
     # Only reload Hyprland when hyprland.lua actually changed (avoids freezing Electron/YandexMusic!)
     if [ -f /tmp/.arushell_hypr_changed ]; then

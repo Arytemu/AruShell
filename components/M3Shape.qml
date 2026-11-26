@@ -30,10 +30,19 @@ Item {
         return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + c.a.toFixed(3) + ")"
     }
 
+    property double _lastShapePaint: 0
+    function _paintThrottled() {
+        if (!visible) return
+        const now = Date.now()
+        if (now - _lastShapePaint >= 32) {
+            _lastShapePaint = now
+            shapeCanvas.requestPaint()
+        }
+    }
     onShapeChanged: shapeCanvas.requestPaint()
-    onFillColorChanged: shapeCanvas.requestPaint()
-    onStrokeColorChanged: shapeCanvas.requestPaint()
-    onMorphFactorChanged: shapeCanvas.requestPaint()
+    onFillColorChanged: _paintThrottled()
+    onStrokeColorChanged: _paintThrottled()
+    onMorphFactorChanged: _paintThrottled()
     onWidthChanged: shapeCanvas.requestPaint()
     onHeightChanged: shapeCanvas.requestPaint()
     onVisibleChanged: if (visible) shapeCanvas.requestPaint()

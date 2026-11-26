@@ -11,6 +11,37 @@ Singleton {
     property bool centerOpen: false
     property bool islandExpanded: false
     property bool dndEnabled: false
+    property var mutedApps: ({})
+
+    function isAppMuted(appName) {
+        const key = String(appName || "").trim().toLowerCase()
+        if (!key || !mutedApps[key]) return false
+        if (Date.now() > mutedApps[key]) {
+            const copy = Object.assign({}, mutedApps)
+            delete copy[key]
+            mutedApps = copy
+            return false
+        }
+        return true
+    }
+
+    function muteApp(appName, hours) {
+        const key = String(appName || "").trim().toLowerCase()
+        if (!key) return
+        const copy = Object.assign({}, mutedApps)
+        copy[key] = Date.now() + hours * 3600 * 1000
+        mutedApps = copy
+        SystemState.showOsd("bell_off", appName, 1.0, "Мут " + hours + "ч", false)
+    }
+
+    function unmuteApp(appName) {
+        const key = String(appName || "").trim().toLowerCase()
+        if (!key) return
+        const copy = Object.assign({}, mutedApps)
+        delete copy[key]
+        mutedApps = copy
+        SystemState.showOsd("bell", appName, 1.0, "Звук вкл", false)
+    }
     property var history: []
     property var activeToast: null
     property int unreadCount: 0
@@ -73,7 +104,7 @@ Singleton {
                 root.unreadCount += 1
             }
 
-            if (!root.dndEnabled) {
+            if (!root.dndEnabled && !root.isAppMuted(entry.appName)) {
                 root.activeToast = entry
                 toastTimer.restart()
             }

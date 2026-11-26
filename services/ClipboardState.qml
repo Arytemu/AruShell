@@ -14,6 +14,7 @@ Singleton {
     property bool open: false
     property var items: []
     property bool hasCliphist: true
+    readonly property string clipScript: Qt.resolvedUrl("clip_preview.py").toString().replace("file://", "")
 
     function toggle() {
         open = !open
@@ -27,7 +28,7 @@ Singleton {
 
     function refresh() {
         if (listProc.running) return
-        listProc.command = ["bash", "-c", "if command -v cliphist >/dev/null 2>&1; then cliphist list | head -n 40 | python3 -c 'import sys,json; out=[]; [out.append({\"id\":p[0],\"text\":p[1].strip(),\"isImage\":\"binary data\" in p[1].lower()}) for l in sys.stdin if \"\\t\" in l for p in [l.split(\"\\t\",1)]]; print(json.dumps(out,ensure_ascii=False))'; else echo '{\"missing\":true}'; fi"]
+        listProc.command = ["python3", root.clipScript]
         listProc.running = true
     }
 

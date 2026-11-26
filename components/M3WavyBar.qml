@@ -48,11 +48,20 @@ Item {
         return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + c.a.toFixed(3) + ")"
     }
 
+    property double _lastWavePaint: 0
+    function _paintThrottled() {
+        if (!visible) return
+        const now = Date.now()
+        if (now - _lastWavePaint >= 32) {
+            _lastWavePaint = now
+            waveCanvas.requestPaint()
+        }
+    }
     onSmoothValChanged: waveCanvas.requestPaint()
-    onPhaseChanged: waveCanvas.requestPaint()
-    onWaveAmpChanged: waveCanvas.requestPaint()
-    onActiveColorChanged: waveCanvas.requestPaint()
-    onTrackColorChanged: waveCanvas.requestPaint()
+    onPhaseChanged: _paintThrottled()
+    onWaveAmpChanged: _paintThrottled()
+    onActiveColorChanged: _paintThrottled()
+    onTrackColorChanged: _paintThrottled()
     onWidthChanged: waveCanvas.requestPaint()
     onHeightChanged: waveCanvas.requestPaint()
     onVisibleChanged: if (visible) waveCanvas.requestPaint()
@@ -61,6 +70,7 @@ Item {
         id: waveCanvas
         anchors.fill: parent
         antialiasing: true
+        renderStrategy: Canvas.Threaded
         Component.onCompleted: requestPaint()
 
         onPaint: {
@@ -96,7 +106,7 @@ Item {
                 const waveEnd = root.showThumb ? Math.max(pad, fillEnd - 4) : fillEnd
                 ctx.strokeStyle = root.cssColor(root.activeColor)
                 ctx.beginPath()
-                const step = 1.5
+                const step = 2.5
                 const k = (Math.PI * 2) / Math.max(10, root.wavelength)
                 let first = true
                 for (let x = pad; x <= waveEnd; x += step) {

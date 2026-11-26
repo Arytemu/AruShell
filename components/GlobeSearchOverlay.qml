@@ -714,14 +714,15 @@ PanelWindow {
                     Behavior on color { ColorAnimation { duration: 140 } }
 
                     SysIcon {
+                        id: globeSpinIcon
                         anchors.centerIn: parent
                         name: GlobeSearchState.loading ? "refresh" : (searchField.text.length > 0 ? "chevron_right" : "language")
                         size: 14
                         color: goMa.containsMouse ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface
-                        rotation: GlobeSearchState.loading ? 360 : 0
-                        NumberAnimation on rotation {
-                            running: GlobeSearchState.loading
+                        RotationAnimation on rotation {
+                            running: globeWin.visible && GlobeSearchState.loading
                             from: 0; to: 360; duration: 900; loops: Animation.Infinite
+                            onRunningChanged: if (!running) globeSpinIcon.rotation = 0
                         }
                     }
 

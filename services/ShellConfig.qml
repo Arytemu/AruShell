@@ -49,12 +49,116 @@ Singleton {
     property bool showWeatherInIsland: true
     property string musicClientMode: "auto"
     property string musicCustomClient: ""
-    property var qsItems: ["wifi", "bt", "nightLight", "powerProfile", "volume", "brightness", "modes", "actions"]
     property var pillItems: ["wifi", "bt", "volume", "battery"]
-    property var qsWideItems: []
-    property int qsWidth: 360
-    property int qsTileHeight: 58
-    property int qsSpacing: 12
+    property var qsGridLayout: [
+        { id: "wifi",       col: 0, row: 0, w: 2, h: 1 },
+        { id: "bt",         col: 2, row: 0, w: 2, h: 1 },
+        { id: "audio",      col: 0, row: 1, w: 2, h: 1 },
+        { id: "power",      col: 2, row: 1, w: 2, h: 1 },
+        { id: "night",      col: 0, row: 2, w: 1, h: 1 },
+        { id: "dnd",        col: 1, row: 2, w: 1, h: 1 },
+        { id: "game",       col: 2, row: 2, w: 1, h: 1 },
+        { id: "awake",      col: 3, row: 2, w: 1, h: 1 },
+        { id: "volume",     col: 0, row: 3, w: 4, h: 1 },
+        { id: "screenshot", col: 0, row: 4, w: 2, h: 1 },
+        { id: "clipboard",  col: 2, row: 4, w: 1, h: 1 },
+        { id: "wallpaper",  col: 3, row: 4, w: 1, h: 1 }
+    ]
+
+    function _overlaps(a, b) {
+        return !(a.col + a.w <= b.col || b.col + b.w <= a.col || a.row + a.h <= b.row || b.row + b.h <= a.row)
+    }
+
+    function _findFreeSpot(list, w, h, ignoreId) {
+        for (let r = 0; r < 10; r++) {
+            for (let c = 0; c <= 4 - w; c++) {
+                const cand = { col: c, row: r, w: w, h: h }
+                let hit = false
+                for (let i = 0; i < list.length; i++) {
+                    if (list[i].id === ignoreId) continue
+                    if (_overlaps(cand, list[i])) { hit = true; break }
+                }
+                if (!hit) return { col: c, row: r }
+            }
+        }
+        return { col: 0, row: 5 }
+    }
+
+    function updateGridTile(id, col, row, w, h) {
+        const list = (qsGridLayout || []).map(function(t) { return Object.assign({}, t) })
+        let target = null
+        for (let i = 0; i < list.length; i++) {
+            if (list[i].id === id) { target = list[i]; break }
+        }
+        if (!target) return
+        const oldPos = { col: target.col, row: target.row }
+        target.w = Math.max(1, Math.min(4, Math.round(w)))
+        target.h = Math.max(1, Math.min(2, Math.round(h)))
+        target.col = Math.max(0, Math.min(4 - target.w, Math.round(col)))
+        target.row = Math.max(0, Math.min(7 - target.h, Math.round(row)))
+
+        // Push any colliding tiles to old position or next free slot
+        for (let i = 0; i < list.length; i++) {
+            const other = list[i]
+            if (other.id === id) continue
+            if (_overlaps(target, other)) {
+                const tryOld = { col: Math.min(4 - other.w, oldPos.col), row: oldPos.row, w: other.w, h: other.h }
+                let oldBlocked = _overlaps(target, tryOld)
+                if (!oldBlocked) {
+                    for (let j = 0; j < list.length; j++) {
+                        if (list[j].id !== id && list[j].id !== other.id && _overlaps(tryOld, list[j])) { oldBlocked = true; break }
+                    }
+                }
+                if (!oldBlocked) {
+                    other.col = tryOld.col
+                    other.row = tryOld.row
+                } else {
+                    const spot = _findFreeSpot(list, other.w, other.h, other.id)
+                    other.col = spot.col
+                    other.row = spot.row
+                }
+            }
+        }
+        qsGridLayout = list
+        save()
+    }
+
+    function removeGridTile(id) {
+        const list = (qsGridLayout || []).filter(function(t) { return t && t.id !== id })
+        if (list.length < 1) return
+        qsGridLayout = list
+        save()
+    }
+
+    function addGridTile(id, defW, defH) {
+        const list = (qsGridLayout || []).map(function(t) { return Object.assign({}, t) })
+        for (let i = 0; i < list.length; i++) if (list[i].id === id) return
+        const w = defW || 1
+        const h = defH || 1
+        const spot = _findFreeSpot(list, w, h, "")
+        list.push({ id: id, col: spot.col, row: spot.row, w: w, h: h })
+        qsGridLayout = list
+        save()
+    }
+
+    function resetQsGrid() {
+        qsGridLayout = [
+            { id: "wifi",       col: 0, row: 0, w: 2, h: 1 },
+            { id: "bt",         col: 2, row: 0, w: 2, h: 1 },
+            { id: "audio",      col: 0, row: 1, w: 2, h: 1 },
+            { id: "power",      col: 2, row: 1, w: 2, h: 1 },
+            { id: "night",      col: 0, row: 2, w: 1, h: 1 },
+            { id: "dnd",        col: 1, row: 2, w: 1, h: 1 },
+            { id: "game",       col: 2, row: 2, w: 1, h: 1 },
+            { id: "awake",      col: 3, row: 2, w: 1, h: 1 },
+            { id: "volume",     col: 0, row: 3, w: 4, h: 1 },
+            { id: "screenshot", col: 0, row: 4, w: 2, h: 1 },
+            { id: "clipboard",  col: 2, row: 4, w: 1, h: 1 },
+            { id: "wallpaper",  col: 3, row: 4, w: 1, h: 1 }
+        ]
+        save()
+    }
+    // QuickSettings grid dimensions are managed dynamically by qsGridLayout
     property int pillIconSize: 16
     property int pillSpacing: 10
     property int pillPadding: 24
@@ -63,6 +167,18 @@ Singleton {
     property bool hyprDynamicBorders: true
     property bool blurTiledBg: true
     property bool kittyAutoFont: true
+    property bool syncSystemTheme: true
+    property bool inhibitWhenAudio: true
+    property bool audioVisualizer: false
+    property bool visFullWidth: true
+    property int visBars: 48
+    property int visHeight: 84
+    property int visSpacing: 4
+    property string visStyle: "bars"
+    property string hyprAnimStyle: "smooth"
+    property string hyprAnimWinStyle: "popin"
+    property string hyprAnimWsStyle: "slide"
+    property real hyprAnimSpeed: 1.0
 
     function recordRecentApp(appKey) {
         const k = String(appKey || "").trim()
@@ -106,65 +222,9 @@ Singleton {
     }
 
 
-    function hasQsItem(id) {
-        return (qsItems || []).indexOf(id) !== -1
-    }
-
-    function toggleQsItem(id) {
-        const list = (qsItems || []).slice()
-        const idx = list.indexOf(id)
-        if (idx !== -1) {
-            if (list.length <= 1) return
-            list.splice(idx, 1)
-        } else {
-            list.push(id)
-        }
-        qsItems = list
-        save()
-    }
-
-
-    function isQsWide(id) {
-        return (qsWideItems || []).indexOf(id) !== -1
-    }
-
-    function toggleQsWide(id) {
-        const list = (qsWideItems || []).slice()
-        const idx = list.indexOf(id)
-        if (idx !== -1) list.splice(idx, 1)
-        else list.push(id)
-        qsWideItems = list
-        save()
-    }
-
-    function resetQsLayout() {
-        qsItems = ["wifi", "bt", "nightLight", "powerProfile", "volume", "brightness", "modes", "actions"]
-        pillItems = ["wifi", "bt", "volume", "battery"]
-        qsWideItems = []
-        qsWidth = 360
-        qsTileHeight = 58
-        qsSpacing = 12
-        pillIconSize = 16
-        pillSpacing = 10
-        pillPadding = 24
-        save()
-    }
 
     function hasPillItem(id) {
         return (pillItems || []).indexOf(id) !== -1
-    }
-
-    function togglePillItem(id) {
-        const list = (pillItems || []).slice()
-        const idx = list.indexOf(id)
-        if (idx !== -1) {
-            if (list.length <= 1) return
-            list.splice(idx, 1)
-        } else {
-            list.push(id)
-        }
-        pillItems = list
-        save()
     }
 
     function resetWidgetPositions() {
@@ -214,12 +274,8 @@ Singleton {
             showWeatherInIsland: showWeatherInIsland,
             musicClientMode: musicClientMode,
             musicCustomClient: musicCustomClient,
-            qsItems: qsItems,
             pillItems: pillItems,
-            qsWideItems: qsWideItems,
-            qsWidth: qsWidth,
-            qsTileHeight: qsTileHeight,
-            qsSpacing: qsSpacing,
+            qsGridLayout: qsGridLayout,
             pillIconSize: pillIconSize,
             pillSpacing: pillSpacing,
             pillPadding: pillPadding,
@@ -227,7 +283,19 @@ Singleton {
             hudFromAlbum: hudFromAlbum,
             hyprDynamicBorders: hyprDynamicBorders,
             blurTiledBg: blurTiledBg,
-            kittyAutoFont: kittyAutoFont
+            kittyAutoFont: kittyAutoFont,
+            syncSystemTheme: syncSystemTheme,
+            inhibitWhenAudio: inhibitWhenAudio,
+            audioVisualizer: audioVisualizer,
+            visFullWidth: visFullWidth,
+            visBars: visBars,
+            visHeight: visHeight,
+            visSpacing: visSpacing,
+            visStyle: visStyle,
+            hyprAnimStyle: hyprAnimStyle,
+            hyprAnimWinStyle: hyprAnimWinStyle,
+            hyprAnimWsStyle: hyprAnimWsStyle,
+            hyprAnimSpeed: Number(hyprAnimSpeed.toFixed(2))
         }, null, 2)
         Quickshell.execDetached(["python3", "-c", "import sys; open(sys.argv[1], 'w', encoding='utf-8').write(sys.argv[2])", settingsPath, payload])
     }
@@ -299,12 +367,8 @@ Singleton {
                 if (d.showWeatherInIsland !== undefined) root.showWeatherInIsland = !!d.showWeatherInIsland
                 if (d.musicClientMode !== undefined) root.musicClientMode = String(d.musicClientMode)
                 if (d.musicCustomClient !== undefined) root.musicCustomClient = String(d.musicCustomClient)
-                if (Array.isArray(d.qsItems) && d.qsItems.length > 0) root.qsItems = d.qsItems
                 if (Array.isArray(d.pillItems) && d.pillItems.length > 0) root.pillItems = d.pillItems
-                if (Array.isArray(d.qsWideItems)) root.qsWideItems = d.qsWideItems
-                if (d.qsWidth !== undefined) root.qsWidth = Math.max(300, Math.min(460, Number(d.qsWidth)))
-                if (d.qsTileHeight !== undefined) root.qsTileHeight = Math.max(46, Math.min(82, Number(d.qsTileHeight)))
-                if (d.qsSpacing !== undefined) root.qsSpacing = Math.max(6, Math.min(20, Number(d.qsSpacing)))
+                if (Array.isArray(d.qsGridLayout) && d.qsGridLayout.length > 0) root.qsGridLayout = d.qsGridLayout
                 if (d.pillIconSize !== undefined) root.pillIconSize = Math.max(13, Math.min(22, Number(d.pillIconSize)))
                 if (d.pillSpacing !== undefined) root.pillSpacing = Math.max(6, Math.min(20, Number(d.pillSpacing)))
                 if (d.pillPadding !== undefined) root.pillPadding = Math.max(16, Math.min(48, Number(d.pillPadding)))
@@ -313,6 +377,18 @@ Singleton {
                 if (d.hyprDynamicBorders !== undefined) root.hyprDynamicBorders = !!d.hyprDynamicBorders
                 if (d.blurTiledBg !== undefined) root.blurTiledBg = !!d.blurTiledBg
                 if (d.kittyAutoFont !== undefined) root.kittyAutoFont = !!d.kittyAutoFont
+                if (d.syncSystemTheme !== undefined) root.syncSystemTheme = !!d.syncSystemTheme
+                if (d.inhibitWhenAudio !== undefined) root.inhibitWhenAudio = !!d.inhibitWhenAudio
+                if (d.audioVisualizer !== undefined) root.audioVisualizer = !!d.audioVisualizer
+                if (d.visFullWidth !== undefined) root.visFullWidth = !!d.visFullWidth
+                if (d.visBars !== undefined) root.visBars = Math.max(16, Math.min(96, Number(d.visBars)))
+                if (d.visHeight !== undefined) root.visHeight = Math.max(40, Math.min(200, Number(d.visHeight)))
+                if (d.visSpacing !== undefined) root.visSpacing = Math.max(2, Math.min(12, Number(d.visSpacing)))
+                if (d.visStyle) root.visStyle = String(d.visStyle)
+                if (d.hyprAnimStyle) root.hyprAnimStyle = String(d.hyprAnimStyle)
+                if (d.hyprAnimWinStyle) root.hyprAnimWinStyle = String(d.hyprAnimWinStyle)
+                if (d.hyprAnimWsStyle) root.hyprAnimWsStyle = String(d.hyprAnimWsStyle)
+                if (d.hyprAnimSpeed !== undefined) root.hyprAnimSpeed = Math.max(0.5, Math.min(2.0, Number(d.hyprAnimSpeed)))
             } catch (e) {}
             loadProc.buf = ""
             root._loaded = true

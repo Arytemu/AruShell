@@ -71,12 +71,17 @@ case "${CMD}" in
     up_txt="$(uptime -p 2>/dev/null | sed 's/^up //' || echo "")"
     usr="${USER:-user}"
 
+    has_cava=0
+    command -v cava >/dev/null 2>&1 && has_cava=1
+
     night_light=0
-    pgrep -x hyprsunset >/dev/null 2>&1 && night_light=1
+    pgrep -x 'hyprsunset|wlsunset|gammastep' >/dev/null 2>&1 && night_light=1
 
     power_prof=""
+    power_profs=""
     if command -v powerprofilesctl >/dev/null 2>&1; then
         power_prof="$(powerprofilesctl get 2>/dev/null || true)"
+        power_profs="$(powerprofilesctl list 2>/dev/null | grep -oE '(power-saver|balanced|performance):' | tr -d ':' | awk '!seen[$0]++' | paste -sd, - || true)"
     fi
 
     kbd_raw=""
@@ -156,6 +161,8 @@ print(json.dumps({
     "userName": sys.argv[19],
     "nightLight": sys.argv[20] == "1",
     "powerProfile": sys.argv[21],
+    "powerProfiles": [x for x in (sys.argv[26] if len(sys.argv) > 26 else "").split(",") if x],
+    "hasCava": (sys.argv[27] == "1") if len(sys.argv) > 27 else True,
     "kbdLayout": (lambda raw: (lambda low, km: "RU" if ("russian" in low or low.startswith("ru")) else ("EN" if ("english" in low or "us" in low or low.startswith("en")) else ("UK" if "ukrain" in low else ("DE" if "german" in low else ("FR" if "french" in low else (km[:2].upper() if km else "EN"))))))(*(lambda kbs: (lambda main: ((main.get("active_keymap") or "").lower(), (main.get("active_keymap") or "")) if main else ("", ""))(next((k for k in kbs if k.get("main")), kbs[0] if kbs else None)))((json.loads(raw).get("keyboards") or []) if raw.strip().startswith("{") else [])))(sys.argv[22]),
     "hostName": sys.argv[23],
     "kernelVer": sys.argv[24],
@@ -163,7 +170,7 @@ print(json.dumps({
     "netDown": net_down,
     "netUp": net_up
 }, ensure_ascii=False))
-' "$wifi_en" "$wifi_ssid" "$eth_con" "$bt_en" "$bt_dev" "$vol" "$muted" "$has_br" "$br" "$has_bat" "$bat_pct" "$bat_chg" "$cpu" "$ram_pct" "$ram_txt" "$disk_pct" "$disk_txt" "$up_txt" "$usr" "$night_light" "$power_prof" "$kbd_raw" "$host_name" "$kern_ver" "$distro_name"
+' "$wifi_en" "$wifi_ssid" "$eth_con" "$bt_en" "$bt_dev" "$vol" "$muted" "$has_br" "$br" "$has_bat" "$bat_pct" "$bat_chg" "$cpu" "$ram_pct" "$ram_txt" "$disk_pct" "$disk_txt" "$up_txt" "$usr" "$night_light" "$power_prof" "$kbd_raw" "$host_name" "$kern_ver" "$distro_name" "$power_profs" "$has_cava"
     ;;
 
   wifi-list)

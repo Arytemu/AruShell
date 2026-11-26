@@ -517,7 +517,14 @@ Singleton {
         return r + g + b
     }
 
+    readonly property string themeSyncScript: Qt.resolvedUrl("theme_sync.py").toString().replace("file://", "")
+
     function syncHyprBorders() {
+        if (ShellConfig.syncSystemTheme) {
+            const pHex = "#" + root._hexNoHash(root.m3Primary)
+            const opHex = "#" + root._hexNoHash(root.m3OnPrimary)
+            Quickshell.execDetached(["python3", root.themeSyncScript, pHex, opHex])
+        }
         if (!ShellConfig.hyprDynamicBorders) return
         const c1 = root._hexNoHash(root.m3Primary)
         const c2 = root._hexNoHash(root.m3PrimaryContainer)
@@ -541,6 +548,13 @@ Singleton {
 
     onM3PrimaryChanged: hyprBorderSyncTimer.restart()
     onSeedColorChanged: hyprBorderSyncTimer.restart()
+    Connections {
+        target: ShellConfig
+        function onSyncSystemThemeChanged() {
+            if (ShellConfig.syncSystemTheme) hyprBorderSyncTimer.restart()
+            else Quickshell.execDetached(["python3", root.themeSyncScript, "reset"])
+        }
+    }
     Component.onCompleted: hyprBorderSyncTimer.restart()
 
     Behavior on m3Primary               { ColorAnimation { duration: 700; easing.type: Easing.InOutCubic } }

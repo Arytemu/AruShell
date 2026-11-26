@@ -110,9 +110,9 @@ Item {
         border.color: MusicState.m3OutlineVariant
         clip: true
 
-        Behavior on width  { M3Anim { duration: 440 } }
+        Behavior on width  { M3Anim { duration: 380 } }
         Behavior on height { M3Anim { duration: 380 } }
-        Behavior on radius { M3Anim { duration: 340 } }
+        Behavior on radius { M3Anim { duration: 380 } }
 
         // Subtle Telegram-style liquid absorption pulse when AlbumCard merges into / emerges from Island
         property real absorbScale: 1.0
@@ -188,6 +188,7 @@ Item {
                 Image {
                     anchors.fill: parent
                     source: MusicState.artUrl
+                    sourceSize: Qt.size(64, 64)
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                 }
@@ -246,7 +247,7 @@ Item {
                         transform: Scale { origin.x: 1.25; origin.y: 7; yScale: barScale }
 
                         SequentialAnimation on barScale {
-                            running: MusicState.isPlaying && !root.isExpanded && !root.isToast
+                            running: root.showTrackInCompactIsland && MusicState.isPlaying && !root.isExpanded && !root.isToast
                             loops: Animation.Infinite
                             NumberAnimation { to: 1.0 - (index % 2) * 0.2; duration: 260 + index * 70; easing.type: Easing.InOutSine }
                             NumberAnimation { to: 0.28 + (index % 2) * 0.14; duration: 260 + index * 60; easing.type: Easing.InOutSine }
@@ -548,7 +549,7 @@ Item {
                                     Layout.preferredWidth: 24; Layout.preferredHeight: 24; radius: 12
                                     color: cPrevMa.containsMouse ? MusicState.m3SurfaceContainerHighest : "transparent"
                                     SysIcon { anchors.centerIn: parent; name: "chevron_left"; size: 13; color: MusicState.m3OnSurfaceVariant }
-                                    MouseArea { id: cPrevMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.calMonthOffset -= 1 }
+                                    MouseArea { id: cPrevMa; anchors.fill: parent; anchors.margins: -5; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.calMonthOffset -= 1 }
                                 }
 
                                 Text {
@@ -566,7 +567,7 @@ Item {
                                     Layout.preferredWidth: 24; Layout.preferredHeight: 24; radius: 12
                                     color: cNextMa.containsMouse ? MusicState.m3SurfaceContainerHighest : "transparent"
                                     SysIcon { anchors.centerIn: parent; name: "chevron_right"; size: 13; color: MusicState.m3OnSurfaceVariant }
-                                    MouseArea { id: cNextMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.calMonthOffset += 1 }
+                                    MouseArea { id: cNextMa; anchors.fill: parent; anchors.margins: -5; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.calMonthOffset += 1 }
                                 }
                             }
 

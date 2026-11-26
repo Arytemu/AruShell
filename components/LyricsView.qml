@@ -47,11 +47,11 @@ Item {
             Item {
                 width: parent.width
                 height: lyricText.implicitHeight
-                scale: isActive ? 1.0 : 0.92
+                scale: isActive ? 1.0 : (dist === 1 ? 0.78 : 0.68)
                 transformOrigin: Item.Left
 
                 Behavior on scale {
-                    NumberAnimation { duration: 260; easing.type: Easing.OutBack; easing.overshoot: 1.08 }
+                    NumberAnimation { duration: 240; easing.type: Easing.OutCubic }
                 }
 
                 Text {
@@ -62,14 +62,13 @@ Item {
                     font.family: MusicState.trackMoodFont
                     font.italic: MusicState.trackMoodItalic
                     font.letterSpacing: MusicState.trackMoodSpacing
-                    font.pixelSize: MusicState.trackGenre === "rap" ? (isActive ? 34 : (dist === 1 ? 23 : 19)) : (isActive ? 28 : (dist === 1 ? 19 : 16))
+                    font.pixelSize: MusicState.trackGenre === "rap" ? 32 : 27
                     font.weight: isActive ? Font.Black : Font.DemiBold
                     color: isActive
                         ? MusicState.m3Primary
                         : Qt.rgba(MusicState.m3OnSurface.r, MusicState.m3OnSurface.g, MusicState.m3OnSurface.b, dist === 1 ? 0.62 : 0.28)
                     visible: false
 
-                    Behavior on font.pixelSize { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: 240 } }
                 }
 

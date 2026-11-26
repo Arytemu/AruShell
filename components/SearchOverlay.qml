@@ -158,7 +158,7 @@ Item {
                 spacing: 10
 
                 Text {
-                    text: "Top Results"
+                    text: "Лучшие результаты"
                     color: MusicState.m3OnSurface
                     font.family: MusicState.fontUi
                     font.pixelSize: 14
@@ -268,7 +268,7 @@ Item {
                 visible: MusicState.searchArtists.length > 0
 
                 Text {
-                    text: "Artists"
+                    text: "Исполнители"
                     color: MusicState.m3OnSurface
                     font.family: MusicState.fontUi
                     font.pixelSize: 14

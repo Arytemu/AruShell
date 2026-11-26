@@ -290,11 +290,6 @@ Row {
                     }
                 }
 
-                WheelHandler {
-                    onWheel: function(event) {
-                        SystemState.adjustVolume(event.angleDelta.y > 0 ? 5 : -5)
-                    }
-                }
 
                 MouseArea {
                     id: sysMa

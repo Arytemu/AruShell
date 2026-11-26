@@ -16,9 +16,9 @@ Item {
     y: SystemState.langMenuOpen ? 0 : -10
     transformOrigin: Item.TopRight
 
-    Behavior on opacity { M3Anim { duration: 220 } }
-    Behavior on scale   { M3Anim { duration: 300 } }
-    Behavior on y       { M3Anim { duration: 300 } }
+    Behavior on opacity { M3Anim { duration: SystemState.langMenuOpen ? 220 : 140 } }
+    Behavior on scale   { M3Anim { duration: SystemState.langMenuOpen ? 280 : 160 } }
+    Behavior on y       { M3Anim { duration: SystemState.langMenuOpen ? 280 : 160 } }
 
     Rectangle {
         anchors.fill: parent

@@ -334,7 +334,7 @@ WlSessionLock {
                                             anchors.centerIn: parent
                                             text: ">_"
                                             color: MusicState.m3OnPrimaryContainer
-                                            font.family: "monospace"
+                                            font.family: MusicState.fontUi
                                             font.pixelSize: 10
                                             font.weight: Font.Bold
                                         }
@@ -343,7 +343,7 @@ WlSessionLock {
                                     Text {
                                         text: "arushellfetch.sh"
                                         color: MusicState.m3OnSurface
-                                        font.family: "monospace"
+                                        font.family: MusicState.fontUi
                                         font.pixelSize: 13
                                         font.weight: Font.Bold
                                     }
@@ -408,21 +408,21 @@ WlSessionLock {
                                                     Layout.preferredWidth: 40
                                                     text: modelData.k
                                                     color: MusicState.m3Primary
-                                                    font.family: "monospace"
+                                                    font.family: MusicState.fontUi
                                                     font.pixelSize: 12
                                                     font.weight: Font.Bold
                                                 }
                                                 Text {
                                                     text: ":"
                                                     color: MusicState.m3OnSurfaceVariant
-                                                    font.family: "monospace"
+                                                    font.family: MusicState.fontUi
                                                     font.pixelSize: 12
                                                 }
                                                 Text {
                                                     Layout.fillWidth: true
                                                     text: modelData.v
                                                     color: MusicState.m3OnSurface
-                                                    font.family: "monospace"
+                                                    font.family: MusicState.fontUi
                                                     font.pixelSize: 12
                                                     elide: Text.ElideRight
                                                 }
@@ -469,6 +469,7 @@ WlSessionLock {
 
                             Image {
                                 id: mediaBgImg
+                    sourceSize: Qt.size(320, 320)
                                 anchors.fill: parent
                                 source: MusicState.artUrl
                                 fillMode: Image.PreserveAspectCrop
@@ -527,7 +528,7 @@ WlSessionLock {
 
                                     Rectangle {
                                         Layout.preferredWidth: 36; Layout.preferredHeight: 36; radius: 18
-                                        color: prevMa.containsMouse ? MusicState.m3PrimaryContainer : Qt.rgba(1, 1, 1, 0.10)
+                                        color: prevMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHighest
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                         SysIcon { anchors.centerIn: parent; name: "skip_prev"; size: 17; color: MusicState.m3OnSurface }
                                         MouseArea { id: prevMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { MusicState.prevTrack(); passHidden.forceActiveFocus() } }
@@ -538,7 +539,7 @@ WlSessionLock {
                                         Layout.preferredHeight: 44
                                         radius: MusicState.isPlaying ? 14 : 22
                                         color: MusicState.m3Primary
-                                        Behavior on Layout.preferredWidth { NumberAnimation { duration: 220; easing.type: Easing.OutBack } }
+                                        Behavior on Layout.preferredWidth { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                                         Behavior on radius { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
 
                                         SysIcon {
@@ -552,7 +553,7 @@ WlSessionLock {
 
                                     Rectangle {
                                         Layout.preferredWidth: 36; Layout.preferredHeight: 36; radius: 18
-                                        color: nextMa.containsMouse ? MusicState.m3PrimaryContainer : Qt.rgba(1, 1, 1, 0.10)
+                                        color: nextMa.containsMouse ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainerHighest
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                         SysIcon { anchors.centerIn: parent; name: "skip_next"; size: 17; color: MusicState.m3OnSurface }
                                         MouseArea { id: nextMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { MusicState.nextTrack(); passHidden.forceActiveFocus() } }
@@ -565,7 +566,7 @@ WlSessionLock {
                                     visible: MusicState.hasTrack && MusicState.trackLength > 0
                                     value: MusicState.trackLength > 0 ? (MusicState.livePosition / MusicState.trackLength) : 0
                                     activeColor: MusicState.m3Primary
-                                    trackColor: Qt.rgba(1, 1, 1, 0.16)
+                                    trackColor: MusicState.m3SurfaceContainerHighest
                                     lineWidth: 4.0
                                     amplitude: 2.2
                                     showThumb: false
@@ -679,6 +680,7 @@ WlSessionLock {
 
                             Image {
                                 id: faceImg
+                    sourceSize: Qt.size(256, 256)
                                 anchors.fill: parent
                                 source: surface.homeDir !== "" ? ("file://" + surface.homeDir + "/.face") : ""
                                 fillMode: Image.PreserveAspectCrop
@@ -713,7 +715,7 @@ WlSessionLock {
                                 color: MusicState.m3SurfaceContainerHigh
                                 border.width: LockState.errorText !== "" ? 2 : 1
                                 border.color: LockState.errorText !== ""
-                                    ? "#F2B8B5"
+                                    ? MusicState.m3Error
                                     : (LockState.passwordText.length > 0 ? MusicState.m3Primary : MusicState.m3OutlineVariant)
                                 Behavior on border.color { ColorAnimation { duration: 160 } }
 
@@ -735,7 +737,7 @@ WlSessionLock {
                                     SysIcon {
                                         name: "lock"
                                         size: 16
-                                        color: LockState.errorText !== "" ? "#F2B8B5" : MusicState.m3OnSurfaceVariant
+                                        color: LockState.errorText !== "" ? MusicState.m3Error : MusicState.m3OnSurfaceVariant
                                         Layout.alignment: Qt.AlignVCenter
                                     }
 
@@ -820,7 +822,7 @@ WlSessionLock {
                             Layout.alignment: Qt.AlignHCenter
                             visible: LockState.errorText !== ""
                             text: LockState.errorText
-                            color: "#F2B8B5"
+                            color: MusicState.m3Error
                             font.family: MusicState.fontUi
                             font.pixelSize: 13
                             font.weight: Font.Bold
@@ -941,7 +943,7 @@ WlSessionLock {
                                     }
                                     Rectangle {
                                         Layout.preferredWidth: 28; Layout.preferredHeight: 28; radius: 14
-                                        color: pMa.containsMouse ? "#B3261E" : MusicState.m3SurfaceContainer
+                                        color: pMa.containsMouse ? MusicState.m3Error : MusicState.m3SurfaceContainer
                                         Behavior on color { ColorAnimation { duration: 140 } }
                                         SysIcon { anchors.centerIn: parent; name: "power"; size: 13; color: MusicState.m3OnSurface }
                                         MouseArea { id: pMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: SystemState.powerOffSystem() }

@@ -37,6 +37,8 @@ PanelWindow {
         { icon: "move",     label: "Стол и музыка",      keys: "рабочий стол виджеты музыка клиент mpris яндекс спотифай клипы видео обложка" },
         { icon: "sliders",  label: "Панели и режимы",    keys: "панель док остров погода osd тост игровой game mode кофеин не засыпать" },
         { icon: "keyboard", label: "Система и бинды",    keys: "бинды клавиши шпаргалка перезапуск буфер обмена" },
+        { icon: "volume_high", label: "Визуализатор",    keys: "визуализатор cava эквалайзер плитки столбики ширина высота" },
+        { icon: "sliders",  label: "Анимации Hyprland",  keys: "анимации hyprland скорость окна воркспейсы пружина плавные" },
         { icon: "settings", label: "О системе",          keys: "о системе about версия ядро kernel hostname cachyos hyprland" }
     ]
 
@@ -71,7 +73,7 @@ PanelWindow {
             id: card
             anchors.centerIn: parent
             width: 780
-            height: 560
+            height: 630
             radius: MusicState.shapeXl
             color: MusicState.m3SurfaceContainer
             border.width: 1
@@ -264,6 +266,7 @@ PanelWindow {
                                         Image {
                                             anchors.fill: parent
                                             source: ShellConfig.wallpaperPath ? ("file://" + ShellConfig.wallpaperPath) : ""
+                                            sourceSize: Qt.size(320, 180)
                                             fillMode: Image.PreserveAspectCrop
                                             asynchronous: true
                                         }
@@ -402,7 +405,7 @@ PanelWindow {
                                         width: 30; height: 30; radius: 15
                                         color: modelData
                                         border.width: ShellConfig.accentOverride === modelData ? 3 : 0
-                                        border.color: "#FFFFFF"
+                                        border.color: MusicState.m3OnSurface
                                         MouseArea {
                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                             onClicked: { ShellConfig.accentOverride = modelData; ShellConfig.save() }
@@ -729,7 +732,9 @@ PanelWindow {
                                     { key: "showWeatherInIsland", label: "Показывать погоду в пилюле островка",            val: ShellConfig.showWeatherInIsland },
                                     { key: "osdEnabled",          label: "Всплывающий OSD (звук, яркость, раскладка)",     val: ShellConfig.osdEnabled },
                                     { key: "blurTiledBg",         label: "Размывать фон за тайловыми окнами",             val: ShellConfig.blurTiledBg },
-                                    { key: "kittyAutoFont",       label: "Авто-масштаб шрифта Kitty под размер окна",     val: ShellConfig.kittyAutoFont }
+                                    { key: "kittyAutoFont",       label: "Авто-масштаб шрифта Kitty под размер окна",     val: ShellConfig.kittyAutoFont },
+                                    { key: "syncSystemTheme",     label: "Синхронизировать акцент с Kitty и GTK3/4",      val: ShellConfig.syncSystemTheme },
+                                    { key: "inhibitWhenAudio",    label: "Не блокировать экран при аудио/видео",          val: ShellConfig.inhibitWhenAudio }
                                 ]
                                 delegate: Rectangle {
                                     required property var modelData
@@ -749,7 +754,6 @@ PanelWindow {
                                     }
                                 }
                             }
-
                             // Game Mode Toggle
                             Rectangle {
                                 Layout.fillWidth: true; Layout.preferredHeight: 52; radius: 18; color: MusicState.m3SurfaceContainerHigh
@@ -876,7 +880,7 @@ PanelWindow {
                         // TAB 4: ABOUT (Caelestia 00:57 style)
                         // =====================================================
                         ColumnLayout {
-                            visible: settingsWin.tabIndex === 4
+                            visible: settingsWin.tabIndex === 6
                             Layout.fillWidth: true
                             spacing: 14
 
@@ -898,7 +902,7 @@ PanelWindow {
                                             anchors.fill: parent
                                             shape: "cookie8"
                                             fillColor: MusicState.m3PrimaryContainer
-                                            spin: settingsWin.tabIndex === 4
+                                            spin: settingsWin.tabIndex === 6
                                             spinDuration: 20000
                                         }
                                         Text {
@@ -938,7 +942,7 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { k: "Версия AruShell", v: "v1.1.0" },
+                                            { k: "Версия AruShell", v: "v1.2.5" },
                                             { k: "Пользователь",    v: SystemState.userName || "user" },
                                             { k: "Хост",         v: SystemState.hostName || "linux" },
                                             { k: "Система",      v: SystemState.distroName || "CachyOS" },
@@ -965,6 +969,286 @@ PanelWindow {
                                                 font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold
                                                 elide: Text.ElideRight
                                             }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // =====================================================
+                        // TAB 5: AUDIO VISUALIZER (CAVA)
+                        // =====================================================
+                        ColumnLayout {
+                            visible: settingsWin.tabIndex === 4
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 10
+                                Text {
+                                    text: "Аудио-визуализатор (Cava)"
+                                    color: MusicState.m3OnSurface
+                                    font.family: MusicState.fontUi; font.pixelSize: 18; font.weight: Font.Bold
+                                    Layout.fillWidth: true
+                                }
+                                Rectangle {
+                                    Layout.preferredHeight: 26
+                                    Layout.preferredWidth: cavaStTxt.implicitWidth + 18
+                                    radius: 13
+                                    color: SystemState.hasCava ? MusicState.m3PrimaryContainer : MusicState.m3ErrorContainer
+                                    Text {
+                                        id: cavaStTxt
+                                        anchors.centerIn: parent
+                                        text: SystemState.hasCava ? "cava установлен" : "cava не найден (pacman -S cava)"
+                                        color: SystemState.hasCava ? MusicState.m3OnPrimaryContainer : MusicState.m3OnErrorContainer
+                                        font.family: MusicState.fontUi; font.pixelSize: 10; font.weight: Font.Bold
+                                    }
+                                }
+                            }
+
+                            // Master On/Off Toggle
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 16
+                                    ColumnLayout {
+                                        Layout.fillWidth: true; spacing: 1
+                                        Text { text: "Включить визуализатор на рабочем столе"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium }
+                                        Text { text: "Автоматически скрывается на паузе (требуется пакет cava)"; color: MusicState.m3OnSurfaceVariant; font.family: MusicState.fontUi; font.pixelSize: 10 }
+                                    }
+                                    Rectangle {
+                                        Layout.preferredWidth: 46; Layout.preferredHeight: 26; radius: 13
+                                        color: ShellConfig.audioVisualizer ? MusicState.m3Primary : MusicState.m3SurfaceContainer
+                                        Rectangle { width: 20; height: 20; radius: 10; y: 3; x: ShellConfig.audioVisualizer ? 23 : 3; color: ShellConfig.audioVisualizer ? MusicState.m3OnPrimary : MusicState.m3OnSurfaceVariant; Behavior on x { M3Anim { duration: 220 } } }
+                                    }
+                                }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.audioVisualizer = !ShellConfig.audioVisualizer; ShellConfig.save() } }
+                            }
+
+                            // Width Mode: Full-screen vs Compact Center
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 8
+                                    Text { text: "Ширина визуализатора"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [
+                                            { full: false, label: "По центру" },
+                                            { full: true,  label: "На весь экран" }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool sel: ShellConfig.visFullWidth === modelData.full
+                                            Layout.preferredHeight: 30; Layout.preferredWidth: vwTxt.implicitWidth + 18; radius: 15
+                                            color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                            Text { id: vwTxt; anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.visFullWidth = modelData.full; ShellConfig.save() } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Smooth Capsule Sliders for Bar Count, Height & Spacing
+                            Repeater {
+                                model: [
+                                    { key: "visBars",    label: "Количество плиток",    minV: 16, maxV: 96,  step: 2, unit: ""   },
+                                    { key: "visHeight",  label: "Высота столбиков",     minV: 40, maxV: 220, step: 4, unit: "px" },
+                                    { key: "visSpacing", label: "Зазор между плитками", minV: 0,  maxV: 12,  step: 1, unit: "px" }
+                                ]
+                                delegate: Rectangle {
+                                    id: visSlCard
+                                    required property var modelData
+                                    readonly property real curVal: Number(ShellConfig[modelData.key])
+                                    readonly property real ratio: Math.max(0.0, Math.min(1.0, (curVal - modelData.minV) / Math.max(1, modelData.maxV - modelData.minV)))
+
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 62
+                                    radius: 18
+                                    color: MusicState.m3SurfaceContainerHigh
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 16; anchors.rightMargin: 16; anchors.topMargin: 8; anchors.bottomMargin: 10
+                                        spacing: 6
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text { Layout.fillWidth: true; text: visSlCard.modelData.label; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Medium }
+                                            Text { text: Math.round(visSlCard.curVal) + visSlCard.modelData.unit; color: MusicState.m3Primary; font.family: MusicState.fontUi; font.pixelSize: 12; font.weight: Font.Bold }
+                                        }
+
+                                        Rectangle {
+                                            id: slTrack
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 16
+                                            radius: 8
+                                            color: MusicState.m3SurfaceContainer
+                                            clip: true
+
+                                            Rectangle {
+                                                anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                                                width: Math.max(16, Math.round(parent.width * visSlCard.ratio))
+                                                radius: 8
+                                                color: MusicState.m3Primary
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                function applyFromX(mx) {
+                                                    const r = Math.max(0.0, Math.min(1.0, mx / slTrack.width))
+                                                    const raw = visSlCard.modelData.minV + r * (visSlCard.modelData.maxV - visSlCard.modelData.minV)
+                                                    const snapped = Math.round(raw / visSlCard.modelData.step) * visSlCard.modelData.step
+                                                    ShellConfig[visSlCard.modelData.key] = Math.max(visSlCard.modelData.minV, Math.min(visSlCard.modelData.maxV, snapped))
+                                                }
+                                                onPressed: function(m) { applyFromX(m.x) }
+                                                onPositionChanged: function(m) { if (pressed) applyFromX(m.x) }
+                                                onReleased: ShellConfig.save()
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Style: Bars vs Mirror Wave
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 8
+                                    Text { text: "Стиль отрисовки"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [
+                                            { id: "bars",   label: "От нижнего края" },
+                                            { id: "mirror", label: "Зеркальная волна" }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool sel: ShellConfig.visStyle === modelData.id
+                                            Layout.preferredHeight: 30; Layout.preferredWidth: vsTxt.implicitWidth + 18; radius: 15
+                                            color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                            Text { id: vsTxt; anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.visStyle = modelData.id; ShellConfig.save() } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // =====================================================
+                        // TAB 6: HYPRLAND ANIMATIONS CUSTOMIZER
+                        // =====================================================
+                        ColumnLayout {
+                            visible: settingsWin.tabIndex === 5
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            Text {
+                                text: "Анимации Hyprland"
+                                color: MusicState.m3OnSurface
+                                font.family: MusicState.fontUi; font.pixelSize: 18; font.weight: Font.Bold
+                            }
+
+                            // Curve Preset
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 62; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                ColumnLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; anchors.topMargin: 8; anchors.bottomMargin: 8; spacing: 6
+                                    Text { text: "Пресет кривых"; color: MusicState.m3OnSurfaceVariant; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                    RowLayout {
+                                        Layout.fillWidth: true; spacing: 6
+                                        Repeater {
+                                            model: [
+                                                { id: "smooth",  label: "Плавные M3" },
+                                                { id: "snappy",  label: "Быстрые" },
+                                                { id: "bounce",  label: "Пружина" },
+                                                { id: "minimal", label: "Минимум" },
+                                                { id: "off",     label: "Выкл" }
+                                            ]
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                readonly property bool sel: ShellConfig.hyprAnimStyle === modelData.id
+                                                Layout.fillWidth: true; Layout.preferredHeight: 28; radius: 14
+                                                color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                                Text { anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.hyprAnimStyle = modelData.id; SystemState.applyHyprAnims() } }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Window Animation Style
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 6
+                                    Text { text: "Открытие окон"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [
+                                            { id: "popin",  label: "Pop-in" },
+                                            { id: "slide",  label: "Slide" },
+                                            { id: "gnomed", label: "Gnomed" },
+                                            { id: "fade",   label: "Fade" }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool sel: ShellConfig.hyprAnimWinStyle === modelData.id
+                                            Layout.preferredHeight: 30; Layout.preferredWidth: awTxt.implicitWidth + 16; radius: 15
+                                            color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                            Text { id: awTxt; anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.hyprAnimWinStyle = modelData.id; SystemState.applyHyprAnims() } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Workspace Transition Style
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 6
+                                    Text { text: "Переход рабочих столов"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [
+                                            { id: "slide",     label: "Slide" },
+                                            { id: "slidefade", label: "SlideFade" },
+                                            { id: "fade",      label: "Fade" },
+                                            { id: "slidevert", label: "Верт." }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool sel: ShellConfig.hyprAnimWsStyle === modelData.id
+                                            Layout.preferredHeight: 30; Layout.preferredWidth: awsTxt.implicitWidth + 14; radius: 15
+                                            color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                            Text { id: awsTxt; anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.hyprAnimWsStyle = modelData.id; SystemState.applyHyprAnims() } }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Speed Multiplier
+                            Rectangle {
+                                Layout.fillWidth: true; Layout.preferredHeight: 54; radius: 18; color: MusicState.m3SurfaceContainerHigh
+                                RowLayout {
+                                    anchors.fill: parent; anchors.leftMargin: 16; anchors.rightMargin: 14; spacing: 6
+                                    Text { text: "Длительность (скорость)"; color: MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 13; font.weight: Font.Medium; Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [
+                                            { v: 0.6, label: "0.6×" },
+                                            { v: 0.8, label: "0.8×" },
+                                            { v: 1.0, label: "1.0×" },
+                                            { v: 1.3, label: "1.3×" },
+                                            { v: 1.6, label: "1.6×" }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool sel: Math.abs(ShellConfig.hyprAnimSpeed - modelData.v) < 0.05
+                                            Layout.preferredHeight: 30; Layout.preferredWidth: 44; radius: 15
+                                            color: sel ? MusicState.m3PrimaryContainer : MusicState.m3SurfaceContainer
+                                            Text { anchors.centerIn: parent; text: modelData.label; color: sel ? MusicState.m3OnPrimaryContainer : MusicState.m3OnSurface; font.family: MusicState.fontUi; font.pixelSize: 11; font.weight: Font.Bold }
+                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { ShellConfig.hyprAnimSpeed = modelData.v; SystemState.applyHyprAnims() } }
                                         }
                                     }
                                 }

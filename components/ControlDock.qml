@@ -256,6 +256,7 @@ Item {
                     Image {
                         anchors.fill: parent
                         source: MusicState.artUrl
+                    sourceSize: Qt.size(96, 96)
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                     }

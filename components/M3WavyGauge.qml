@@ -37,10 +37,19 @@ Item {
         return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + c.a.toFixed(3) + ")"
     }
 
+    property double _lastGaugePaint: 0
+    function _paintThrottled() {
+        if (!visible) return
+        const now = Date.now()
+        if (now - _lastGaugePaint >= 35) {
+            _lastGaugePaint = now
+            gaugeCanvas.requestPaint()
+        }
+    }
     onSmoothPctChanged: gaugeCanvas.requestPaint()
-    onPhaseChanged: gaugeCanvas.requestPaint()
-    onActiveColorChanged: gaugeCanvas.requestPaint()
-    onTrackColorChanged: gaugeCanvas.requestPaint()
+    onPhaseChanged: _paintThrottled()
+    onActiveColorChanged: _paintThrottled()
+    onTrackColorChanged: _paintThrottled()
     onWidthChanged: gaugeCanvas.requestPaint()
     onHeightChanged: gaugeCanvas.requestPaint()
     onVisibleChanged: if (visible) gaugeCanvas.requestPaint()
@@ -49,6 +58,7 @@ Item {
         id: gaugeCanvas
         anchors.fill: parent
         antialiasing: true
+        renderStrategy: Canvas.Threaded
         Component.onCompleted: requestPaint()
 
         onPaint: {
